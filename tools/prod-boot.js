@@ -9,11 +9,12 @@
   var DEFAULTS = {
     units:   { temp:'C', wind:'kmh' },  // 'C'|'F' , 'kmh'|'mph'
     clock:   '12',                       // '12' or '24' hour clock
-    scene:   'mountains',                // mountains|city|beach|desert|rotate|random
+    scene:   'mountains',                // mountains|city|beach|desert|forest|aurora|village|rotate|random
     showHud: true,
     photo:   null,                       // file:// URL or null
     location:null,                       // {lat,lon,name} or null -> auto (IP)
-    theme:   'auto'
+    theme:   'auto',
+    sound:   false                       // ambient rain/wind/cricket audio, off by default
   };
   var CONFIG = Object.assign({}, DEFAULTS, (typeof window!=='undefined' && window.LW_CONFIG) || {});
   window.__lwPaused = false;
@@ -210,8 +211,12 @@
     if(hud) hud.style.display = CONFIG.showHud ? '' : 'none';
   }
 
+  function applySound(){
+    if(typeof Sound !== 'undefined') Sound.setEnabled(!!CONFIG.sound);
+  }
+
   // ---- scene selection (SCENE is an engine global) ----
-  var SCENE_LIST = ['mountains','city','beach','desert'];
+  var SCENE_LIST = ['mountains','city','beach','desert','forest','aurora','village'];
   function resolveScene(v){
     if(v === 'random') return SCENE_LIST[Math.floor(Math.random()*SCENE_LIST.length)];
     if(v === 'rotate'){
@@ -230,6 +235,7 @@
     applyScene();
     applyPhoto();
     applyHudVisibility();
+    applySound();
     syncUI();       // re-render clock (picks up new format)
     updateHUD();
     if(locChanged) refreshWeather();
@@ -273,10 +279,11 @@
     if(name==='showHud')       applyConfig({ showHud: !!val });
     else if(name==='units')    applyConfig({ units: (val==='Fahrenheit'||val===1) ? {temp:'F',wind:'mph'} : {temp:'C',wind:'kmh'} });
     else if(name==='clock')    applyConfig({ clock: (val==='24-hour'||val===1) ? '24' : '12' });
-    else if(name==='scene'){   var sc=['mountains','city','beach','desert','rotate','random']; var si=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ scene: sc[si]||'mountains' }); }
+    else if(name==='scene'){   var sc=['mountains','city','beach','desert','forest','aurora','village','rotate','random']; var si=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ scene: sc[si]||'mountains' }); }
     else if(name==='usePhoto'){ usePhotoBg = !!val; refreshPhoto(); }
     else if(name==='photo'){    lastPhotoRel = (val==null ? '' : String(val)).trim() || null; refreshPhoto(); }
     else if(name==='cityName'){ var s=String(val||'').trim(); if(s) geocodeCity(s); else applyConfig({ location:null }); }
+    else if(name==='sound')    applyConfig({ sound: !!val });
   };
   // Lively lifecycle (pause when a fullscreen app is focused)
   window.livelyWallpaperPlaybackChanged = function(e){
@@ -287,6 +294,7 @@
   applyScene();
   applyPhoto();
   applyHudVisibility();
+  applySound();
   applyUnits();
   tick();
   refreshWeather();

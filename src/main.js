@@ -6,6 +6,11 @@ const config = require('./config');
 const desktop = require('./desktop-win');
 const pkg = require('../package.json');
 
+// The wallpaper window is focusable:false and never receives real user input, so
+// Chromium's default autoplay policy (requires a user gesture) would silently
+// block the optional ambient audio from ever starting. Must be set before ready.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 // electron-as-wallpaper attaches a BrowserWindow behind the desktop icons
 // using the Windows Progman/WorkerW technique. Loaded lazily & defensively.
 let wallpaperLib = null;

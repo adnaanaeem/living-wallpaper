@@ -133,6 +133,7 @@
     <button class="btn" id="now">🕒 Real time</button>
     <button class="btn" id="loc">📍 Live weather</button>
     <button class="btn rain" id="rain">🌧 Rain</button>
+    <button class="btn" id="sound">🔈 Sound</button>
     <button class="btn" id="photoBtn">🖼 Add photo</button>
     <input id="photoInput" type="file" accept="image/*" style="display:none">
     <select class="btn" id="sceneSel" style="padding:8px 10px">
@@ -140,6 +141,9 @@
       <option value="city">🏙 City Skyline</option>
       <option value="beach">🏝 Ocean / Beach</option>
       <option value="desert">🏜 Desert Dunes</option>
+      <option value="forest">🌲 Forest</option>
+      <option value="aurora">🌌 Aurora</option>
+      <option value="village">🏘 Snowy Village</option>
     </select>
     <div class="meta" id="meta"><span class="dot" style="background:#888"></span>Drag the bar to scrub the day · pick a scene · drop a photo anywhere.</div>
   </div>
@@ -168,6 +172,8 @@ let rainLevel = 0;
 let liveWeather = null;
 let temperature = 20;   // °C, drives snow/frost/heat visuals
 let photoImg = null, photoReady = false;  // optional real-photo background
+let shootingStars = [];                   // rare event: clear night sky
+let rainbowLevel = 0, prevRainLevel = 0;  // rare event: right after rain tapers off
 
 // ---------- helpers ----------
 function lerp(a,b,t){ return a+(b-a)*t; }
@@ -406,6 +412,60 @@ function ensureFlakes(target){
 }
 function newFlake(){ return { x:Math.random()*W, y:Math.random()*H, r:1+Math.random()*2.4, sp:0.6+Math.random()*1.4, sway:0.4+Math.random()*1.2, ph:Math.random()*Math.PI*2 }; }
 
+// ---------- ambient audio (procedural — no asset files, off by default) ----------
+const Sound = (function(){
+  let ac=null, master=null, rainGain=null, windGain=null, rainFilter=null, windFilter=null, enabled=false, nextCricket=0;
+  function noiseBuffer(seconds){
+    const buf=ac.createBuffer(1, Math.round(ac.sampleRate*seconds), ac.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    return buf;
+  }
+  function init(){
+    if(ac) return;
+    try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+    master=ac.createGain(); master.gain.value=0; master.connect(ac.destination);
+
+    const rainSrc=ac.createBufferSource(); rainSrc.buffer=noiseBuffer(4); rainSrc.loop=true;
+    rainFilter=ac.createBiquadFilter(); rainFilter.type='bandpass'; rainFilter.frequency.value=2600; rainFilter.Q.value=0.6;
+    rainGain=ac.createGain(); rainGain.gain.value=0;
+    rainSrc.connect(rainFilter); rainFilter.connect(rainGain); rainGain.connect(master); rainSrc.start();
+
+    const windSrc=ac.createBufferSource(); windSrc.buffer=noiseBuffer(6); windSrc.loop=true;
+    windFilter=ac.createBiquadFilter(); windFilter.type='lowpass'; windFilter.frequency.value=420; windFilter.Q.value=0.5;
+    windGain=ac.createGain(); windGain.gain.value=0;
+    windSrc.connect(windFilter); windFilter.connect(windGain); windGain.connect(master); windSrc.start();
+  }
+  function cricketChirp(){
+    if(!ac) return;
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type='sine'; o.frequency.value=2600+Math.random()*800;
+    g.gain.value=0; o.connect(g); g.connect(master);
+    const t=ac.currentTime;
+    g.gain.linearRampToValueAtTime(0.05,t+0.01);
+    g.gain.linearRampToValueAtTime(0,t+0.09);
+    o.start(t); o.stop(t+0.12);
+  }
+  function setEnabled(v){
+    enabled=!!v;
+    if(enabled) init();
+    if(!ac) return;
+    if(ac.state==='suspended') ac.resume().catch(()=>{});
+    master.gain.setTargetAtTime(enabled?0.6:0, ac.currentTime, 0.3);
+  }
+  function update(dtMs, rainLevel, isSnow, night, cold){
+    if(!enabled || !ac) return;
+    const t=ac.currentTime, ramp=0.4;
+    rainGain.gain.setTargetAtTime((isSnow?0:rainLevel)*0.5, t, ramp);
+    windGain.gain.setTargetAtTime(0.05+rainLevel*0.12+cold*0.05, t, ramp);
+    if(night>0.6 && rainLevel<0.05 && cold<0.3){
+      nextCricket-=dtMs;
+      if(nextCricket<=0){ cricketChirp(); nextCricket=400+Math.random()*1400; }
+    }
+  }
+  return { setEnabled, update, isEnabled:()=>enabled };
+})();
+
 // ================= illustrated scenes (swappable landscapes) =================
 // Sky, sun/moon, stars and clouds are shared; only the landscape swaps.
 let SCENE = 'mountains';
@@ -532,13 +592,170 @@ function drawSceneMountains(sky,sun,moon,night,rainK,snowCover,heat){
     for(const t of trees){ const w=t.h*0.42; ctx.beginPath(); ctx.moveTo(t.x,t.y-t.h*0.86); ctx.lineTo(t.x-w*0.22,t.y-t.h*0.72); ctx.lineTo(t.x+w*0.22,t.y-t.h*0.72); ctx.closePath(); ctx.fill(); } }
 }
 
+// ---- Forest ----
+let forestTrees=[];
+function buildForest(){
+  forestTrees=[];
+  const layers=[
+    { n:14, yBase:H*0.90, hMin:0.10, hMax:0.19, depth:0.78 },
+    { n:11, yBase:H*0.95, hMin:0.16, hMax:0.27, depth:0.45 },
+    { n:8,  yBase:H*1.00, hMin:0.24, hMax:0.40, depth:0.12 }
+  ];
+  layers.forEach(function(L){
+    for(let i=0;i<L.n;i++){
+      forestTrees.push({
+        x: W*((i+0.15+Math.random()*0.7)/L.n),
+        y: L.yBase + Math.random()*H*0.01,
+        h: H*(L.hMin+Math.random()*(L.hMax-L.hMin)),
+        depth: L.depth
+      });
+    }
+  });
+  forestTrees.sort((a,b)=>b.depth-a.depth); // farthest first
+}
+let fireflies=[];
+function buildFireflies(){
+  fireflies=[];
+  for(let i=0;i<24;i++){
+    fireflies.push({ x:Math.random()*W, y:H*(0.6+Math.random()*0.34), ph:Math.random()*Math.PI*2,
+      sp:0.4+Math.random()*1.1, dx:(Math.random()-0.5)*0.25, dy:(Math.random()-0.5)*0.15 });
+  }
+}
+function drawSceneForest(sky,sun,moon,night,rainK,snowCover,heat){
+  const floorY=H*0.86;
+  const floorBase=mix([26,32,18], sky.hor, 0.12);
+  const fg=ctx.createLinearGradient(0,floorY,0,H);
+  fg.addColorStop(0, rgb(stormy(mix(floorBase,[236,240,248],snowCover*0.6),rainK*0.3)));
+  fg.addColorStop(1, rgb(stormy(mix([12,16,9],[210,218,230],snowCover*0.6),rainK*0.3)));
+  ctx.fillStyle=fg; ctx.fillRect(0,floorY,W,H-floorY);
+  const base=stormy([6,10,7], rainK*0.3);
+  for(const t of forestTrees){
+    const treeCol=rgb(mix(base, sky.hor, t.depth*0.32));
+    drawPine(t, treeCol);
+    if(snowCover>0.25){
+      const w=t.h*0.42;
+      ctx.fillStyle=rgb([244,248,255], (snowCover-0.25)*1.1*(1-t.depth*0.4));
+      ctx.beginPath(); ctx.moveTo(t.x,t.y-t.h*0.86); ctx.lineTo(t.x-w*0.22,t.y-t.h*0.72); ctx.lineTo(t.x+w*0.22,t.y-t.h*0.72); ctx.closePath(); ctx.fill();
+    }
+  }
+  // fireflies: only on clear, mild nights
+  const fA=clamp((night-0.55)*3,0,1)*(1-rainK)*(1-clamp(snowCover*2,0,1));
+  if(fA>0.02){
+    for(const f of fireflies){
+      f.x+=f.dx*0.3; f.y+=f.dy*0.3; f.ph+=0.05*f.sp;
+      if(f.x<0) f.x=W; if(f.x>W) f.x=0; if(f.y<floorY) f.y=floorY; if(f.y>H*0.97) f.y=H*0.97;
+      const tw=0.3+0.7*Math.max(0,Math.sin(f.ph));
+      ctx.fillStyle=rgb([200,255,140], fA*tw*0.85);
+      ctx.beginPath(); ctx.arc(f.x,f.y,1.6,0,Math.PI*2); ctx.fill();
+    }
+  }
+}
+
+// ---- Aurora (arctic night sky) ----
+let arcticRanges=[];
+function buildAurora(){
+  arcticRanges=[
+    { pts:ridge(2.4, HORIZON-H*0.06, H*0.07, 0.5), depth:0.8 },
+    { pts:ridge(6.6, HORIZON-H*0.02, H*0.10, 0.8), depth:0.5 },
+    { pts:ridge(10.3, HORIZON+H*0.01, H*0.12, 1.0), depth:0.2 }
+  ];
+}
+function drawAuroraRibbons(night, rainK){
+  const a=clamp((night-0.45)*2,0,1)*(1-rainK);
+  if(a<=0.02) return;
+  const t=performance.now()*0.00035;
+  const bands=[
+    { col:[70,230,150],  yBase:H*0.10, amp:H*0.05,  freq:1.3, speed:1.0, width:H*0.09 },
+    { col:[120,110,240], yBase:H*0.18, amp:H*0.06,  freq:1.0, speed:0.7, width:H*0.07 },
+    { col:[60,200,220],  yBase:H*0.26, amp:H*0.045, freq:1.6, speed:1.3, width:H*0.06 }
+  ];
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+  for(const b of bands){
+    ctx.beginPath();
+    for(let x=0;x<=W;x+=W/60){
+      const y=b.yBase + Math.sin(x*0.004*b.freq + t*b.speed*6)*b.amp + Math.sin(x*0.011+t*3)*b.amp*0.3;
+      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.lineWidth=b.width; ctx.lineCap='round';
+    ctx.strokeStyle=rgb(b.col, a*0.22);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawSceneAurora(sky,sun,moon,night,rainK,snowCover,heat){
+  drawAuroraRibbons(night, rainK);
+  const forcedSnow=Math.max(snowCover,0.6);
+  for(const r of arcticRanges) drawRange(r, sky, sun.altitude, rainK, forcedSnow);
+  const shoreY=H*0.92;
+  const g=ctx.createLinearGradient(0,shoreY,0,H);
+  g.addColorStop(0, rgb(mix([200,212,232],[250,252,255],0.5)));
+  g.addColorStop(1, rgb(mix([170,182,204],[240,244,250],0.4)));
+  ctx.fillStyle=g; ctx.fillRect(0,shoreY,W,H-shoreY);
+}
+
+// ---- Snowy village ----
+let village=[];
+function buildVillage(){
+  village=[];
+  const groundY=H*0.90;
+  const spots=[0.10,0.22,0.35,0.50,0.64,0.77,0.90];
+  spots.forEach(function(s){
+    const w=W*(0.05+Math.random()*0.03);
+    const h=H*(0.09+Math.random()*0.05);
+    const cols=2, rows=2;
+    const lit=[]; for(let k=0;k<cols*rows;k++) lit.push(Math.random()<0.6);
+    village.push({ x:W*s-w/2, y:groundY-(Math.random()*H*0.01), w, h, cols, rows, lit,
+      depth:0.2+Math.random()*0.5, ph:Math.random()*6 });
+  });
+  village.sort((a,b)=>b.depth-a.depth);
+}
+function drawCabin(b, sky, night, rainK, snowCover){
+  const topY=b.y-b.h;
+  const wallCol=stormy(mix([60,42,30], sky.hor, b.depth*0.4), rainK*0.3);
+  ctx.fillStyle=rgb(wallCol); ctx.fillRect(b.x, topY, b.w, b.h);
+  const roofH=b.h*0.55;
+  ctx.beginPath(); ctx.moveTo(b.x-b.w*0.08, topY); ctx.lineTo(b.x+b.w/2, topY-roofH); ctx.lineTo(b.x+b.w*1.08, topY); ctx.closePath();
+  ctx.fillStyle=rgb(mix([30,20,16], sky.hor, b.depth*0.3)); ctx.fill();
+  const snowAmt=Math.max(snowCover,0.35);
+  ctx.beginPath();
+  ctx.moveTo(b.x-b.w*0.08, topY); ctx.lineTo(b.x+b.w/2, topY-roofH); ctx.lineTo(b.x+b.w*1.08, topY);
+  ctx.lineTo(b.x+b.w*0.92, topY-roofH*0.12); ctx.lineTo(b.x+b.w/2, topY-roofH*0.86); ctx.lineTo(b.x+b.w*0.08, topY-roofH*0.12);
+  ctx.closePath(); ctx.fillStyle=rgb([248,251,255], snowAmt*0.9); ctx.fill();
+  const winOn=clamp((night-0.1)*1.4,0,1);
+  const gw=b.w/b.cols, gh=b.h/b.rows*0.7, pad=gw*0.25; let k=0;
+  for(let r=0;r<b.rows;r++) for(let c=0;c<b.cols;c++){
+    if(b.lit[k++] && winOn>0.02){
+      const fl=0.75+0.25*Math.sin(performance.now()*0.0018+b.ph+k);
+      ctx.fillStyle=rgb([255,200,120], winOn*fl*(1-b.depth*0.3));
+      ctx.fillRect(b.x+c*gw+pad, topY+b.h*0.18+r*gh, gw-pad*2, gh*0.6);
+    }
+  }
+  ctx.fillStyle=rgb([244,248,255], Math.max(snowCover,0.3)*0.5*(1-b.depth*0.3));
+  ctx.fillRect(b.x-b.w*0.1, b.y-2, b.w*1.2, 4);
+}
+function drawSceneVillage(sky,sun,moon,night,rainK,snowCover,heat){
+  const groundY=H*0.90;
+  const forcedSnow=Math.max(snowCover,0.5);
+  const g=ctx.createLinearGradient(0,groundY,0,H);
+  g.addColorStop(0, rgb(mix([210,220,236],[250,252,255],forcedSnow*0.6)));
+  g.addColorStop(1, rgb(mix([170,182,204],[236,240,248],forcedSnow*0.6)));
+  ctx.fillStyle=g; ctx.fillRect(0,groundY,W,H-groundY);
+  for(const b of village) drawCabin(b, sky, night, rainK, forcedSnow);
+  const treeCol=rgb(stormy([6,10,7], rainK*0.25));
+  for(const t of trees) drawPine(t, treeCol);
+}
+
 function drawLandscape(sky,sun,moon,night,rainK,snowCover,heat){
   if(SCENE==='city')        drawSceneCity(sky,sun,moon,night,rainK,snowCover,heat);
   else if(SCENE==='beach')  drawSceneBeach(sky,sun,moon,night,rainK,snowCover,heat);
   else if(SCENE==='desert') drawSceneDesert(sky,sun,moon,night,rainK,snowCover,heat);
+  else if(SCENE==='forest') drawSceneForest(sky,sun,moon,night,rainK,snowCover,heat);
+  else if(SCENE==='aurora') drawSceneAurora(sky,sun,moon,night,rainK,snowCover,heat);
+  else if(SCENE==='village')drawSceneVillage(sky,sun,moon,night,rainK,snowCover,heat);
   else                      drawSceneMountains(sky,sun,moon,night,rainK,snowCover,heat);
 }
-function buildScenes(){ buildCity(); buildBeach(); buildDesert(); }
+function buildScenes(){ buildCity(); buildBeach(); buildDesert(); buildForest(); buildFireflies(); buildAurora(); buildVillage(); }
 
 // ---------- photo relighting ----------
 function coverDraw(img){
@@ -630,6 +847,7 @@ function draw(now){
 
   const sun=sunInfo(minutes), moon=moonInfo(minutes);
   const night=1-clamp(sun.altitude*1.5,0,1);
+  Sound.update(dt, rainLevel, isSnow, night, cold);
 
   if(photoImg && photoReady){
     drawPhotoScene(sky,sun,moon,night,rainK,cold,heat);
@@ -666,6 +884,24 @@ function draw(now){
     }
   }
 
+  // --- rare event: shooting stars, clear night sky only ---
+  if(starA>0.5 && Math.random()<0.0006*dt){
+    const sx=W*(0.15+Math.random()*0.7), sy=H*(0.05+Math.random()*0.25);
+    const ang=Math.PI*0.22+Math.random()*0.15;
+    shootingStars.push({ x:sx, y:sy, vx:Math.cos(ang)*9, vy:Math.sin(ang)*9, life:1, trail:[] });
+  }
+  for(let i=shootingStars.length-1;i>=0;i--){
+    const s=shootingStars[i];
+    s.trail.push({x:s.x,y:s.y}); if(s.trail.length>14) s.trail.shift();
+    s.x+=s.vx*(dt/16); s.y+=s.vy*(dt/16); s.life-=0.02*(dt/16);
+    if(s.life<=0 || s.x>W+40 || s.y>HORIZON+40){ shootingStars.splice(i,1); continue; }
+    ctx.beginPath();
+    for(let j=0;j<s.trail.length;j++){ const p=s.trail[j]; j===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y); }
+    ctx.lineTo(s.x,s.y);
+    ctx.strokeStyle=rgb([255,255,255], s.life*0.8*starA); ctx.lineWidth=1.6; ctx.lineCap='round'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(s.x,s.y,1.8,0,Math.PI*2); ctx.fillStyle=rgb([255,255,255], s.life*starA); ctx.fill();
+  }
+
   // --- sun: glow + disc (swells & reddens near horizon) ---
   if(sun.up && sun.altitude>-0.06){
     const low=1-clamp(sun.altitude,0,1);
@@ -698,6 +934,25 @@ function draw(now){
     if(c.x>1.25) c.x=-0.25;
     drawCloud(c, sky, sun, rainK, clamp(cover,0,0.95));
   }
+
+  // --- rare event: rainbow, briefly after rain tapers off in daylight ---
+  const rainTapering = prevRainLevel>rainLevel && rainLevel>0.03 && rainLevel<0.5 && !isSnow;
+  if(rainTapering && sun.up && sun.altitude>0.12) rainbowLevel=Math.max(rainbowLevel,1);
+  if(rainbowLevel>0.01){
+    if(!(sun.up && sun.altitude>0.05) || rainLevel>0.6) rainbowLevel*=0.96;
+    else rainbowLevel=Math.max(0, rainbowLevel-0.0016*dt);
+    const cx=W*0.5, cy=HORIZON+H*0.05, R=Math.min(W,H)*0.55;
+    const bandCols=[[255,80,80],[255,160,60],[255,230,90],[110,220,120],[90,170,255],[130,110,230]];
+    ctx.save(); ctx.globalCompositeOperation='screen';
+    for(let i=0;i<bandCols.length;i++){
+      ctx.beginPath();
+      ctx.arc(cx,cy,R-i*(R*0.022),Math.PI,Math.PI*2);
+      ctx.strokeStyle=rgb(bandCols[i], rainbowLevel*0.32);
+      ctx.lineWidth=R*0.022; ctx.stroke();
+    }
+    ctx.restore();
+  }
+  prevRainLevel=rainLevel;
 
   // --- landscape (selected scene) ---
   drawLandscape(sky, sun, moon, night, rainK, snowCover, heat);
@@ -758,6 +1013,7 @@ const metaEl=document.getElementById('meta');
 const playBtn=document.getElementById('play');
 const nowBtn=document.getElementById('now');
 const rainBtn=document.getElementById('rain');
+const soundBtn=document.getElementById('sound');
 const locBtn=document.getElementById('loc');
 const tempSlider=document.getElementById('temp');
 const tempVal=document.getElementById('tempval');
@@ -843,6 +1099,10 @@ seek.addEventListener('input', ()=>{ minutes=+seek.value; playing=false; playBtn
 playBtn.addEventListener('click', ()=>{ playing=!playing; playBtn.textContent=playing?'⏸ Pause':'▶ Play cycle'; playBtn.classList.toggle('active',playing); });
 nowBtn.addEventListener('click', ()=>{ const d=new Date(); minutes=d.getHours()*60+d.getMinutes(); playing=false; playBtn.textContent='▶ Play cycle'; playBtn.classList.remove('active'); syncUI(); });
 rainBtn.addEventListener('click', ()=>{ rainOn=!rainOn; rainBtn.classList.toggle('active',rainOn); if(rainOn) setMeta('#6ea8fe','Rain: manual override ON'); else setMeta('#888', liveWeather? liveWeather.text : 'Rain off'); });
+soundBtn.addEventListener('click', ()=>{
+  const on=!Sound.isEnabled(); Sound.setEnabled(on);
+  soundBtn.classList.toggle('active',on); soundBtn.textContent = on ? '🔊 Sound' : '🔈 Sound';
+});
 function setMeta(color,text){ metaEl.innerHTML=`<span class="dot" style="background:${color}"></span>${text}`; }
 
 // ---------- live weather (Open-Meteo, no key) ----------

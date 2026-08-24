@@ -6,14 +6,15 @@ const { app } = require('electron');
 const DEFAULTS = {
   units:      { temp: 'C', wind: 'kmh' }, // 'C'|'F', 'kmh'|'mph'
   clock:      '12',        // '12' or '24' hour clock
-  scene:      'mountains', // mountains|city|beach|desert|rotate|random
+  scene:      'mountains', // mountains|city|beach|desert|forest|aurora|village|rotate|random
   showHud:    true,
   photo:      null,        // absolute path to a single image, or null
   photos:     null,        // ordered array of image paths for day cross-fade, or null
   location:   null,        // { lat, lon, name } or null => auto (IP)
   monitor:    'all',       // 'all' or a display id (number as string)
   autostart:  false,
-  pauseOnFullscreen: true
+  pauseOnFullscreen: true,
+  sound:      false        // ambient rain/wind/cricket audio, off by default
 };
 
 function file() {
@@ -47,7 +48,8 @@ function toRenderer(cfg) {
     photo:    cfg.photo ? toUrl(cfg.photo) : null,
     photos:   (cfg.photos && cfg.photos.length) ? cfg.photos.map(toUrl) : null,
     location: cfg.location,
-    theme:    'auto'
+    theme:    'auto',
+    sound:    !!cfg.sound
   };
 }
 

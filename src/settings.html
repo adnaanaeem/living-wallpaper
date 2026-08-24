@@ -57,6 +57,9 @@
       <div class="sceneCard" data-v="city"><img src="../assets/scenes/city.jpg" alt=""><span>City Skyline</span></div>
       <div class="sceneCard" data-v="beach"><img src="../assets/scenes/beach.jpg" alt=""><span>Ocean / Beach</span></div>
       <div class="sceneCard" data-v="desert"><img src="../assets/scenes/desert.jpg" alt=""><span>Desert Dunes</span></div>
+      <div class="sceneCard" data-v="forest"><img src="../assets/scenes/forest.jpg" alt=""><span>Forest</span></div>
+      <div class="sceneCard" data-v="aurora"><img src="../assets/scenes/aurora.jpg" alt=""><span>Aurora</span></div>
+      <div class="sceneCard" data-v="village"><img src="../assets/scenes/village.jpg" alt=""><span>Snowy Village</span></div>
     </div>
     <div class="seg" id="segScene" style="margin-top:8px">
       <button data-v="rotate">🔁 Rotate daily</button>
@@ -131,6 +134,10 @@
       <label>Start with Windows</label>
       <label class="switch"><input type="checkbox" id="autostart"><span class="track"></span></label>
     </div>
+    <div class="row">
+      <label>Ambient sound (rain / wind / crickets)</label>
+      <label class="switch"><input type="checkbox" id="sound"><span class="track"></span></label>
+    </div>
   </div>
 
   <div class="foot">
@@ -163,6 +170,7 @@
     $('showHud').checked = !!cfg.showHud;
     $('pauseFs').checked = !!cfg.pauseOnFullscreen;
     $('autostart').checked = !!cfg.autostart;
+    $('sound').checked = !!cfg.sound;
     $('photoName').textContent = (cfg.photos && cfg.photos.length)
       ? (cfg.photos.length + ' photos — day cross-fade')
       : (cfg.photo ? cfg.photo : 'Illustrated scene (no photo)');
@@ -193,6 +201,7 @@
   $('showHud').onchange = (e) => save({ showHud: e.target.checked });
   $('pauseFs').onchange = (e) => save({ pauseOnFullscreen: e.target.checked });
   $('autostart').onchange = (e) => save({ autostart: e.target.checked });
+  $('sound').onchange = (e) => save({ sound: e.target.checked });
   $('monitor').onchange = (e) => save({ monitor: e.target.value });
   document.querySelectorAll('#sceneGrid .sceneCard').forEach(c =>
     c.onclick = () => save({ scene: c.dataset.v }));
