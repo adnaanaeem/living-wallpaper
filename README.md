@@ -19,7 +19,7 @@ and an option to **relight your own photo** through the day.
 24-hour cycle with a seek bar, switch scenes, and test rain/snow at any temperature,
 right in your browser. No install needed.
 
-![Mountains scene at golden hour with the live weather panel](assets/screenshots/hero-mountains-hud.jpg)
+![Living Wallpaper trailer — cycling through Mountains, City, Beach, Desert, Forest, Aurora and Snowy Village with live weather](assets/trailer.gif)
 
 ## Screenshots
 
@@ -29,6 +29,10 @@ right in your browser. No install needed.
 | **City** — windows light up after dark | **Beach** — bright noon, waves & palms |
 | ![Desert at golden hour with heat haze](assets/screenshots/desert-heat.jpg) | ![Mountains at night in the snow](assets/screenshots/mountains-snow-night.jpg) |
 | **Desert** — heat-haze on the horizon | **Mountains** — snow at night, moonlit |
+| ![Forest at night with fireflies](assets/screenshots/forest-fireflies.jpg) | ![Aurora ribbons over snowy hills](assets/screenshots/aurora-night.jpg) |
+| **Forest** — fireflies on clear, mild nights | **Aurora** — animated ribbons over arctic hills |
+| ![Snowy village at night with lit windows](assets/screenshots/snowy-village-night.jpg) | |
+| **Snowy Village** — cozy cabins, snow falling | |
 
 There are two ways to run it — pick either or both.
 
