@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>About Living Wallpaper</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#0f1524; color:#e8edf5; padding:22px; text-align:center; }
+  .icon { width:72px; height:72px; border-radius:16px; margin-bottom:10px; }
+  h1 { font-size:17px; margin:0 0 2px; }
+  .ver { font-size:12px; opacity:0.55; margin-bottom:10px; }
+  .desc { font-size:12.5px; opacity:0.75; line-height:1.5; margin:0 auto 18px; max-width:320px; }
+  .card { background:#161d2e; border:1px solid #232c42; border-radius:14px; padding:16px; text-align:left; }
+  .dev { display:flex; align-items:center; gap:12px; }
+  .avatar { width:52px; height:52px; border-radius:50%; background:#0f1524; flex:none; }
+  .devinfo h2 { font-size:14px; margin:0 0 2px; }
+  .devinfo p { font-size:12px; opacity:0.6; margin:0; line-height:1.4; }
+  .links { display:flex; gap:8px; margin-top:14px; }
+  .btn { flex:1; background:#2b60c8; color:#fff; border:0; border-radius:9px; padding:9px 10px;
+    font-size:12.5px; cursor:pointer; text-align:center; }
+  .btn.ghost { background:#222c42; }
+  .foot { font-size:11px; opacity:0.45; margin-top:16px; }
+  .foot a { color:#9db4e0; text-decoration:none; }
+  .skeleton { opacity:0.4; }
+</style>
+</head>
+<body>
+  <img class="icon" src="../assets/icon-256.png" alt="">
+  <h1 id="appName">Living Wallpaper</h1>
+  <div class="ver" id="appVer">v—</div>
+  <div class="desc" id="appDesc"></div>
+
+  <div class="card">
+    <div class="dev">
+      <img class="avatar" id="avatar" alt="">
+      <div class="devinfo">
+        <h2 id="devName">adnaanaeem</h2>
+        <p id="devBio">Loading developer info…</p>
+      </div>
+    </div>
+    <div class="links">
+      <button class="btn" id="btnProfile">GitHub Profile</button>
+      <button class="btn ghost" id="btnRepo">Repository</button>
+    </div>
+  </div>
+
+  <div class="foot">
+    MIT License · <a href="#" id="btnIssue">Report an issue</a>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  (async () => {
+    const info = await window.LW.getAppInfo();
+    $('appName').textContent = info.name;
+    $('appVer').textContent = 'v' + info.version;
+    $('appDesc').textContent = info.description || '';
+
+    $('btnProfile').onclick = () => window.LW.openExternal(info.authorUrl);
+    $('btnRepo').onclick = () => window.LW.openExternal(info.homepage);
+    $('btnIssue').onclick = (e) => { e.preventDefault(); window.LW.openExternal(info.homepage + '/issues'); };
+
+    try {
+      const r = await fetch('https://api.github.com/users/' + info.author);
+      if (!r.ok) throw new Error('github api ' + r.status);
+      const gh = await r.json();
+      $('avatar').src = gh.avatar_url;
+      $('devName').textContent = gh.name || gh.login;
+      $('devBio').textContent = gh.bio || ('github.com/' + gh.login);
+    } catch (e) {
+      $('devBio').textContent = 'github.com/' + info.author + ' (offline — details unavailable)';
+    }
+  })();
+</script>
+</body>
+</html>

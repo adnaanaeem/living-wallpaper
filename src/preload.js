@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('LW', {
   getDisplays:()        => ipcRenderer.invoke('lw:get-displays'),
   geocode:    (query)   => ipcRenderer.invoke('lw:geocode', query),
   setLocation:(loc)     => ipcRenderer.invoke('lw:set-location', loc),
-  close:      ()        => ipcRenderer.invoke('lw:close-settings')
+  close:      ()        => ipcRenderer.invoke('lw:close-settings'),
+  getAppInfo: ()        => ipcRenderer.invoke('lw:get-app-info'),
+  openExternal:(url)    => ipcRenderer.invoke('lw:open-external', url)
 });

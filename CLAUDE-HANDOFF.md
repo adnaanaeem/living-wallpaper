@@ -122,6 +122,12 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
 - `settings.html` is the tray UI: scene **thumbnail picker**, units, 12/24h clock,
   photo(s), location (**Leaflet map** click or city search), monitor, autostart,
   game-pause.
+- `about.html` is the tray **About…** window: app name/version/description come from
+  `package.json` via `lw:get-app-info`; the developer card fetches
+  `https://api.github.com/users/<author>` directly from the renderer (same pattern as
+  the weather calls — no IPC proxy needed) and falls back to static text if offline.
+  External links go through `lw:open-external`, which only allows `https://github.com/…`
+  URLs — the renderer never gets a raw `shell.openExternal`.
 
 ### 3.4 Native dependency note (important)
 `electron-as-wallpaper@^2` compiles a **Rust (Neon / N-API)** module at `npm install`.
@@ -199,6 +205,9 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
   can't survive an uninstall.
 - ✅ Settings toggle switches (info panel / pause-on-fullscreen / start-with-Windows)
   fixed — they were unclickable (see §8).
+- ✅ Tray **About…** window (app info + live GitHub developer card).
+- ✅ README has a download badge, build-status badge, and a screenshot gallery
+  (`assets/screenshots/`, excluded from the packaged app via `build.files`).
 
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so

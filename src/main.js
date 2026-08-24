@@ -1,9 +1,10 @@
 'use strict';
-const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, screen, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, screen, nativeImage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 const desktop = require('./desktop-win');
+const pkg = require('../package.json');
 
 // electron-as-wallpaper attaches a BrowserWindow behind the desktop icons
 // using the Windows Progman/WorkerW technique. Loaded lazily & defensively.
@@ -140,6 +141,7 @@ function rebuildTrayMenu() {
     { label: 'Start with Windows', type: 'checkbox', checked: !!cfg.autostart,
       click: (mi) => { cfg.autostart = mi.checked; config.save(cfg); applyAutostart(); } },
     { type: 'separator' },
+    { label: 'About…', click: openAbout },
     { label: 'Quit', click: () => { destroyWallpaperWindows(); tray.destroy(); app.exit(0); } }
   ]);
   tray.setContextMenu(menu);
@@ -163,6 +165,20 @@ function openSettings() {
   settingsWin.setMenu(null);
   settingsWin.loadFile(path.join(__dirname, 'settings.html'));
   settingsWin.on('closed', () => { settingsWin = null; });
+}
+
+// ---- about window ----
+let aboutWin = null;
+function openAbout() {
+  if (aboutWin && !aboutWin.isDestroyed()) { aboutWin.focus(); return; }
+  aboutWin = new BrowserWindow({
+    width: 360, height: 460, resizable: false, minimizable: false, maximizable: false,
+    title: 'About Living Wallpaper',
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true }
+  });
+  aboutWin.setMenu(null);
+  aboutWin.loadFile(path.join(__dirname, 'about.html'));
+  aboutWin.on('closed', () => { aboutWin = null; });
 }
 
 function applyAutostart() {
@@ -231,3 +247,14 @@ ipcMain.handle('lw:set-location', (_e, loc) => {
   return cfg;
 });
 ipcMain.handle('lw:close-settings', () => { if (settingsWin) settingsWin.close(); });
+ipcMain.handle('lw:get-app-info', () => ({
+  name: pkg.productName || pkg.name,
+  version: app.getVersion(),
+  description: pkg.description,
+  author: pkg.author && pkg.author.name,
+  authorUrl: 'https://github.com/' + (pkg.author && pkg.author.name),
+  homepage: pkg.homepage
+}));
+ipcMain.handle('lw:open-external', (_e, url) => {
+  if (typeof url === 'string' && /^https:\/\/github\.com\//.test(url)) shell.openExternal(url);
+});

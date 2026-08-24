@@ -1,5 +1,9 @@
 # Living Wallpaper (Windows)
 
+[![Download latest release](https://img.shields.io/github/v/release/adnaanaeem/living-wallpaper?style=for-the-badge&label=Download&logo=windows&logoColor=white&color=2f7d3c)](https://github.com/adnaanaeem/living-wallpaper/releases/latest)
+[![Build status](https://img.shields.io/github/actions/workflow/status/adnaanaeem/living-wallpaper/build.yml?branch=main&style=for-the-badge&label=build)](https://github.com/adnaanaeem/living-wallpaper/actions)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
+
 > **Developers:** read **`CLAUDE-HANDOFF.md`** first — it documents the architecture,
 > the `tools/` pipeline, the config schema, and the roadmap.
 
@@ -8,6 +12,17 @@ A live desktop wallpaper: one scene that moves through **sunrise → noon → su
 in real time, with **live rain/snow**, **temperature-driven visuals** (snow caps, frost,
 heat-haze), an on-screen **weather panel** (auto location by IP, powered by Open-Meteo),
 and an option to **relight your own photo** through the day.
+
+![Mountains scene at golden hour with the live weather panel](assets/screenshots/hero-mountains-hud.jpg)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![City skyline at night](assets/screenshots/city-night.jpg) | ![Beach at midday](assets/screenshots/beach-midday.jpg) |
+| **City** — windows light up after dark | **Beach** — bright noon, waves & palms |
+| ![Desert at golden hour with heat haze](assets/screenshots/desert-heat.jpg) | ![Mountains at night in the snow](assets/screenshots/mountains-snow-night.jpg) |
+| **Desert** — heat-haze on the horizon | **Mountains** — snow at night, moonlit |
 
 There are two ways to run it — pick either or both.
 
@@ -103,6 +118,7 @@ Output lands in `dist/` (an NSIS installer). For a quick unpacked build use `npm
 - **Pause / Resume** — stop rendering to save power
 - **Reload wallpaper** — re-attach after display changes
 - **Start with Windows** — toggle autostart
+- **About…** — version, description, and developer info (pulled from GitHub)
 - **Quit**
 
 ---
