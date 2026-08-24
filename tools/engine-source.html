@@ -42,6 +42,10 @@
   .btn:hover { background:rgba(255,255,255,0.14); }
   .btn.active { background:rgba(110,168,254,0.28); border-color:#6ea8fe; }
   .btn.rain.active { background:rgba(80,140,255,0.30); border-color:#6ea8fe; }
+  /* the closed <select> reads fine against the page's dark background, but its
+     native popup list falls back to the browser's own (light) background —
+     force it dark here so the light option text stays readable. */
+  select.btn option { background:#141a2b; color:#e8edf5; }
 
   .meta { font-size:12px; opacity:0.72; margin-top:4px; min-height:16px; }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
