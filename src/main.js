@@ -35,21 +35,14 @@ function init() {
 }
 
 // ---- choose the surface(s) to cover ----
-// 'all'  -> ONE window spanning the union of every display (most reliable on
-//           extended desktops; the scene stretches across all monitors).
+// 'all'  -> one window per display, each showing the full scene. A single
+//           window spanning the union of every display's bounds doesn't
+//           attach reliably behind desktop icons on monitors with different
+//           resolutions/DPI, so each monitor gets its own window instead.
 // <id>   -> one window on that single display.
-function unionBounds(displays) {
-  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
-  for (const d of displays) {
-    const b = d.bounds;
-    x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y);
-    x2 = Math.max(x2, b.x + b.width); y2 = Math.max(y2, b.y + b.height);
-  }
-  return { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
-}
 function targetBounds() {
   const all = screen.getAllDisplays();
-  if (cfg.monitor === 'all') return [unionBounds(all)];
+  if (cfg.monitor === 'all') return all.map(d => d.bounds);
   const one = all.find(d => String(d.id) === String(cfg.monitor));
   return [(one || screen.getPrimaryDisplay()).bounds];
 }
