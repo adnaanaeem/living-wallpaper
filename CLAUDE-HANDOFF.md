@@ -18,7 +18,7 @@ to your drive and keep going.
 | Runs as | Real `.exe`, renders behind desktop icons via `electron-as-wallpaper` (Windows WorkerW) | HTML wallpaper inside the free **Lively Wallpaper** app |
 | Needs | Nothing extra (build the exe) | Lively installed |
 | Custom photo | Native file picker, any path | Lively **folderDropdown** (copies image in); pasted paths are blocked by Chromium |
-| Multi-monitor | Built-in ("All monitors" spans the desktop) | Configured in Lively's own UI |
+| Multi-monitor | Built-in — one window per display ("All monitors" or pick one) | Configured in Lively's own UI |
 | Game-pause | Built-in (koffi fullscreen detection) | Lively's own pause |
 
 Both render the **same scene engine**. The engine is authored once and compiled to two
@@ -35,7 +35,9 @@ LivingWallpaper/
 ├─ SETUP-GITHUB.md       ← push + CI instructions
 ├─ package.json          ← Electron app manifest + electron-builder config
 ├─ push.bat / push.sh    ← one-step GitHub push helpers
-├─ .github/workflows/build.yml   ← CI: builds the Windows .exe on tag/push
+├─ nsis/installer.nsh    ← NSIS hooks: force-kill the app before install/uninstall
+├─ .github/workflows/build.yml   ← CI: builds the .exe + LivingWallpaper-Lively.zip on
+│                                    tag/push, publishes both to the Release on a tag
 │
 ├─ src/                  ← the STANDALONE Electron app
 │  ├─ main.js            ← main process: wallpaper windows, WorkerW attach, tray,
@@ -107,11 +109,15 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
 - **Photo:** single or cross-fade set; `toFileUrl()` handles quotes/spaces/relative paths.
 
 ### 3.3 Electron shell (`src/`)
-- `main.js` creates a borderless, focusable=false BrowserWindow spanning the target
-  display(s) and calls `attach()` from **electron-as-wallpaper** to reparent it behind
-  the icons. Tray menu (Settings / Pause / Reload / autostart / Quit). Pushes config into
-  the renderer via `executeJavaScript`. Polls `desktop-win.isForegroundFullscreen()`
-  every 3 s to pause on games.
+- `main.js` creates **one borderless, focusable=false BrowserWindow per target display**
+  (never a single window spanning multiple monitors — see §8) and calls `attach()` from
+  **electron-as-wallpaper** to reparent each one behind the icons. Tray menu (Settings /
+  Pause / Reload / autostart / Quit). Pushes config into the renderer via
+  `executeJavaScript`. Polls `desktop-win.isForegroundFullscreen()` every 3 s to pause on
+  games.
+- `nsis/installer.nsh` (`customInit` / `customUnInit`) force-kills any running
+  `Living Wallpaper.exe` before install, upgrade, or uninstall — otherwise the wallpaper
+  window can survive an uninstall and stay stuck on screen.
 - `config.js` persists `%APPDATA%/Living Wallpaper/config.json`.
 - `settings.html` is the tray UI: scene **thumbnail picker**, units, 12/24h clock,
   photo(s), location (**Leaflet map** click or city search), monitor, autostart,
@@ -184,6 +190,15 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - ✅ Settings map location picker (Leaflet + OSM).
 - ✅ Icons (icon.ico / tray.png) generated.
 - ✅ GitHub Actions CI (Rust + Node → NSIS installer, release on tag). Deps verified.
+- ✅ CI regenerates `lively/index.html` and packages `LivingWallpaper-Lively.zip` on
+  every build, attaching it to the Release next to the `.exe` — same commit, both
+  artifacts, so the Lively pack can't drift out of sync again.
+- ✅ Multi-monitor fixed: one window per display instead of one window spanning the
+  union of all displays (the latter didn't attach reliably — see §8).
+- ✅ Uninstall fixed: NSIS `customInit`/`customUnInit` force-kill the running app so it
+  can't survive an uninstall.
+- ✅ Settings toggle switches (info panel / pause-on-fullscreen / start-with-Windows)
+  fixed — they were unclickable (see §8).
 
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so
@@ -217,6 +232,27 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - Engine globals (`SCENE`, `minutes`, `temperature`, functions) are top-level `let`/decls
   shared across `<script>` blocks — `prod-boot.js` reassigns `fmt`, `drawPhotoScene`,
   `updateHUD`, `SCENE` by name. Keep them top-level.
+- **Never create one BrowserWindow spanning multiple monitors.** It doesn't attach
+  reliably behind the icons when monitors have different resolution/DPI — the secondary
+  monitor just keeps showing the normal Windows wallpaper. Always one window per display.
+- **Mixed-DPI monitors:** Electron/Chromium can create a `BrowserWindow` with the wrong
+  initial DPI context when its `x`/`y` land on a monitor with a different scale factor
+  than the primary, rendering it undersized on that monitor (a thin strip of the old
+  wallpaper stays visible at the edge). Fix: call `win.setBounds(b)` again right after
+  creation (and again on `did-finish-load`) to force Chromium to re-layout for the
+  correct monitor. `electron-as-wallpaper`'s `attach()` itself only does `SetParent` —
+  it never touches size/position, so this isn't its bug.
+- **`.switch` toggles in `settings.html`:** the real `<input type="checkbox">` is hidden
+  (`display:none`) and a decorative `.track` span shows the visual state. That wrapper
+  **must be a `<label>`**, not a bare `<span>` — otherwise clicking the visible switch
+  never reaches the checkbox and `onchange` never fires. All three toggles were broken
+  this way before being fixed.
+- `package.json`'s `dist` script must keep `--publish never`. Because `package.json` has
+  a `repository` field and CI sets `GH_TOKEN`, electron-builder's default
+  `onTagOrDraft` publish policy will otherwise auto-publish the GitHub Release **itself**
+  on a tag push, uploading the installer a second time under its own sanitized filename
+  (dots instead of hyphens) alongside the workflow's explicit release step — same file,
+  two names, one release.
 
 ## 9. Continuing with Claude
 Point Claude at this file first. Good next asks: "add a Forest scene", "add fog + lightning
