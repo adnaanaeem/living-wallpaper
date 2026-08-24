@@ -2,12 +2,76 @@
 
 A living desktop wallpaper: **one scene that moves through sunrise → noon → sunset →
 night in real time**, with **live rain/snow**, **temperature-driven visuals**, an
-on-screen **weather panel**, **four illustrated scenes** (Mountains, City, Beach,
-Desert), and an option to **relight your own photo** through the day.
+on-screen **weather panel**, **seven illustrated scenes** (Mountains, City, Beach,
+Desert, Forest, Aurora, Snowy Village), rare weather delights (shooting stars,
+post-rain rainbows), optional **ambient audio**, and an option to **relight your own
+photo** through the day.
 
 This doc is the single source of truth for picking the project back up — what's built,
 how it fits together, how to run/develop it, and what's planned. Copy this whole folder
 to your drive and keep going.
+
+---
+
+## 0. Pick up here — mid-flight, not yet released
+
+Everything below is **committed and pushed to `main`** (as of commit `253428f`,
+2026-08-24 ~20:15). Working tree is clean. **Nothing is tagged/released yet** — `v1.0.6`
+is the next tag and will bundle all of this in one release. `package.json` is already
+bumped to `1.0.6`.
+
+**What's done and verified working** (tested live in a browser via the
+`.claude/launch.json` `scene-demo` static server — `node tools/build-wallpaper.js`,
+then `python -m http.server 8934`, navigate to `/tools/engine-source.html`, drive
+`SCENE`/`minutes`/`temperature`/`liveWeather` globals directly via the JS console,
+force a few `draw()` calls, screenshot the canvas — see §8 for why `computer`
+screenshot doesn't work headlessly and the `canvas.toDataURL()` workaround):
+
+1. **Auto-update filename fix** (commit `57dc415`) — `nsis.artifactName` pinned to
+   `Living-Wallpaper-Setup.exe`, `dist/*.blockmap` added to the release `files:` glob.
+   README download badges switched to direct asset links. Full root-cause writeup in
+   §6.1 under `v1.0.6`.
+2. **Rare weather events** — shooting stars (clear nights) and a rainbow after rain
+   tapers off in daylight. Confirmed rendering; rainbow alpha was tuned up once
+   (0.16 → 0.32 per band) after the first test render looked too faint.
+3. **Ambient audio** — procedural Web Audio (no asset files), off by default, toggle
+   wired through Settings/Lively/config. Confirmed the toggle flips `Sound.isEnabled()`
+   without throwing; **not** confirmed to actually produce audible sound in a real
+   packaged build yet (couldn't hear it from this environment) — worth a real listen
+   after the next install.
+4. **Three new scenes** — Forest, Aurora, Snowy Village. Confirmed all three render
+   correctly with no console errors, including at night/with snow/with the HUD.
+
+**What's NOT done yet — do these in order:**
+
+1. **Scene thumbnails.** `src/settings.html`'s scene picker now references
+   `assets/scenes/forest.jpg`, `assets/scenes/aurora.jpg`, `assets/scenes/village.jpg` —
+   **none of these three files exist yet.** Until they're added, those three tiles in
+   Settings show broken images (functionally fine, just ugly). Generate them the same
+   way the screenshots in `assets/screenshots/` were made this session: drive the demo
+   canvas via the console (no HUD needed — the existing `mountains.jpg` etc. are plain
+   scene shots, 360×203, JPEG ~q85), e.g. for forest: `SCENE='forest'; minutes=1100;
+   temperature=18;` then force-draw and `canvas.toDataURL('image/jpeg',0.85)`. Resize to
+   360×203 to match the existing four (`assets/scenes/mountains.jpg` etc.) — use PIL
+   (`python -c "from PIL import Image; ..."`, confirmed available in this environment)
+   or equivalent. Pick a flattering moment per scene: forest at golden hour or with
+   fireflies at night, aurora at night (its whole point), village at dusk/night with
+   windows lit.
+2. **Commit the thumbnails.**
+3. **Tag `v1.0.6` and push it**, wait for the release build, then verify with
+   `gh release view v1.0.6` that the installer is named exactly
+   `Living-Wallpaper-Setup.exe` (no version, no spaces/dots), and that `.blockmap`,
+   `latest.yml`, and `LivingWallpaper-Lively.zip` are all attached. Then sanity-check
+   the README's direct-download links actually resolve:
+   `curl -IL https://github.com/adnaanaeem/living-wallpaper/releases/latest/download/Living-Wallpaper-Setup.exe`
+   should end in `200`, not `404`.
+4. **Trailer GIF/video for the README and social sharing** — asked for, not started.
+   `tools/gen-preview.js` already exists (uses `@napi-rs/canvas` + `gif-encoder-2` from
+   `tools/package.json`, needs `cd tools && npm install` first) and generates
+   `lively/preview.gif`, a short single-scene loop. A "trailer" would want to be a bit
+   longer/punchier and probably cycle through 2-3 scenes — either extend that script or
+   write a sibling one. Reasonable to just build and ship everything else first, then
+   circle back to this since it's the most open-ended piece.
 
 ---
 
@@ -85,31 +149,53 @@ A single `<canvas>` with a `requestAnimationFrame` loop (`draw()`), all pure fun
 - **Shared layers (all scenes):** sky gradient, horizon glow tracking the sun/moon,
   stars + Milky Way at night, sun/moon discs & bloom, soft volumetric clouds.
 - **Swappable landscape:** `drawLandscape()` dispatches on the global `SCENE` to
-  `drawSceneMountains / City / Beach / Desert`. Seeded geometry is built in
-  `buildScenes()` (called from `resize()`).
+  `drawSceneMountains / City / Beach / Desert / Forest / Aurora / Village`. Seeded
+  geometry is built in `buildScenes()` (called from `resize()`). Forest reuses
+  `drawPine()` in three depth layers + fireflies; Aurora reuses `drawRange()`/`ridge()`
+  for permanently-snowy hills plus its own animated ribbon bands
+  (`drawAuroraRibbons()`); Village is small lit cabins (`drawCabin()`) with snow-capped
+  roofs, reusing the shared `trees` array for foreground pines.
 - **Weather & temperature (shared):** `rainLevel` smoothing; temperature factors
   `cold / freeze / heat`; precipitation renders as **rain** or **snow** depending on
   temperature; `snowCover` whitens scenes; heat adds a horizon **heat-haze**; a
   cool/warm colour grade overlays everything.
+- **Rare weather events (shared, in `draw()`):** shooting stars spawn at low random
+  chance on clear night skies (`starA>0.5`) and animate as a fading streak
+  (`shootingStars` array). A rainbow (`rainbowLevel`) triggers when `rainLevel` is
+  detected tapering off (`prevRainLevel>rainLevel`) while the sun is reasonably high,
+  then fades out over roughly a minute or two.
+- **Ambient audio (`Sound` object, off by default):** procedural Web Audio — no asset
+  files. Filtered white-noise buffers for rain (bandpass) and wind (lowpass), gains
+  driven each frame by `Sound.update(dt, rainLevel, isSnow, night, cold)`; scheduled
+  oscillator chirps for crickets on clear, mild, rainless nights. `Sound.setEnabled()`
+  lazily creates the `AudioContext` on first enable (see `main.js`'s
+  `autoplay-policy` switch in §3.3 for why the wallpaper window needs that).
 - **Photo mode:** `drawPhotoScene()` relights a photo with multiply (brightness/temp),
   soft-light (golden hour), and screen (sun/moon bloom) passes. Multi-photo cross-fade
   is handled by an override in `prod-boot.js`.
 - **HUD:** glass weather card (location, big temp + condition icon, clock+date, chips for
-  feels-like / humidity / wind / precip).
+  feels-like / humidity / wind / precip). It's a DOM overlay (`#hud` div), **not** drawn
+  into the canvas — matters if you ever want to screenshot the full look including the
+  HUD (see §8's canvas-screenshot workaround, which composites it in via an SVG
+  `foreignObject`).
 
 Open `engine-source.html` in a browser to develop: seek bar, scene dropdown, Rain
-toggle, temperature slider, photo add, Live-weather button.
+toggle, Sound toggle, temperature slider, photo add, Live-weather button.
 
 ### 3.2 Production layer (`tools/prod-boot.js`)
 An IIFE appended after the engine that turns the demo into a real wallpaper:
 - Drives the **real system clock** (updates every 15 s); overrides `fmt()` for 12/24h.
 - **Auto weather:** IP geolocation (`ipwho.is`) → Open-Meteo current conditions; refresh
   every 10 min. Overrides `updateHUD()` to apply unit conversions.
-- **Scene resolver:** maps `mountains|city|beach|desert|rotate|random` → the engine's
-  `SCENE` (rotate = day-of-year, random = per launch).
+- **Scene resolver:** maps `mountains|city|beach|desert|forest|aurora|village|rotate|
+  random` (`SCENE_LIST`) → the engine's `SCENE` (rotate = day-of-year, random = per
+  launch).
 - **Config:** reads `window.LW_CONFIG` (Electron injects it) with defaults; listens for
   `lw-config`, `lw-pause`, `lw-resume` events; exposes `livelyPropertyListener` +
   `livelyWallpaperPlaybackChanged` for Lively.
+- **Sound:** `applySound()` calls the engine's `Sound.setEnabled(!!CONFIG.sound)` — see
+  §3.1's Sound engine note. Wired into `applyConfig()`, Lively's `sound` checkbox
+  property, and boot.
 - **Photo:** single or cross-fade set; `toFileUrl()` handles quotes/spaces/relative paths.
 
 ### 3.3 Electron shell (`src/`)
@@ -168,14 +254,15 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
 {
   "units":    { "temp": "C|F", "wind": "kmh|mph" },
   "clock":    "12|24",
-  "scene":    "mountains|city|beach|desert|rotate|random",
+  "scene":    "mountains|city|beach|desert|forest|aurora|village|rotate|random",
   "showHud":  true,
   "photo":    "C:\\path\\img.jpg | null",     // single photo
   "photos":   ["...","..."] ,                  // ordered set -> day cross-fade
   "location": { "lat": 0, "lon": 0, "name": "City, CC" } | null,  // null = auto (IP)
   "monitor":  "all | <displayId>",
   "autostart": false,
-  "pauseOnFullscreen": true
+  "pauseOnFullscreen": true,
+  "sound":    false          // ambient rain/wind/cricket audio, off by default
 }
 ```
 Weather: **Open-Meteo** (no key). Reverse geocode: **BigDataCloud**. IP locate:
