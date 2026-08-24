@@ -21,7 +21,8 @@ The fastest way to see it live on your desktop. No build step.
 
 2. Import it — use **one** of these (this is the step that usually trips people up):
 
-   - **Easiest:** drag **`LivingWallpaper-Lively.zip`** (included next to this project)
+   - **Easiest:** drag **`LivingWallpaper-Lively.zip`** — included next to this project,
+     or download the latest one from [Releases](https://github.com/adnaanaeem/living-wallpaper/releases/latest) —
      and **drop it onto the Lively window**. Lively reads the manifest from the zip root.
    - **Or:** in Lively click **+ Add Wallpaper**, then in the box that says
      *“Drag & drop or paste a file/URL”*, browse to and select the **`index.html`**
@@ -162,5 +163,7 @@ LivingWallpaper/
 - **Photo relighting** is a global day/night color grade; it can't move real shadows.
   For maximum realism, shoot the same scene at a few times of day and cross-fade — ask
   and this can be added as a "multi-photo" mode.
-- Rendering `.exe` requires building on Windows (or a Windows CI runner). This repo is
-  the complete source; there is no prebuilt binary included.
+- Rendering `.exe` requires building on Windows (or a Windows CI runner) — but you don't
+  have to: every [Release](https://github.com/adnaanaeem/living-wallpaper/releases/latest)
+  ships a prebuilt installer **and** a matching `LivingWallpaper-Lively.zip`, built
+  together from the same commit so they never drift apart.

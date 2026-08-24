@@ -43,6 +43,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Regenerate lively/index.html from the current scene engine, then package
+      # the Lively pack the same way users are told to grab it (zip of the
+      # lively/ folder's contents, manifest at the zip root) so it always
+      # matches this build, not a stale local copy.
+      - name: Build Lively pack zip
+        shell: pwsh
+        run: |
+          node tools/build-wallpaper.js
+          Compress-Archive -Path lively/* -DestinationPath dist/LivingWallpaper-Lively.zip -Force
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -51,6 +61,7 @@ jobs:
             dist/*.exe
             dist/*.blockmap
             dist/latest.yml
+            dist/LivingWallpaper-Lively.zip
           if-no-files-found: warn
 
       - name: Publish GitHub Release (on tag)
@@ -60,5 +71,6 @@ jobs:
           files: |
             dist/*.exe
             dist/latest.yml
+            dist/LivingWallpaper-Lively.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
