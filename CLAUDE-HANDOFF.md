@@ -132,6 +132,15 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
   the weather calls — no IPC proxy needed) and falls back to static text if offline.
   External links go through `lw:open-external`, which only allows `https://github.com/…`
   URLs — the renderer never gets a raw `shell.openExternal`.
+- **Auto-update:** `electron-updater`'s `autoUpdater` checks GitHub Releases (config in
+  `package.json`'s `build.publish` — same repo, no token needed since it's public) on
+  launch and every 6h, plus on demand via tray **Check for Updates…**. `autoDownload` is
+  off; both the download and the restart-to-install are gated behind a confirmation
+  dialog. Only works in a packaged install (`app.isPackaged`) — a no-op message under
+  `npm start`. Needs `latest.yml` + the `.exe` + `.blockmap` on the release, which CI
+  already produces and attaches (see §6.1). `build.publish` is metadata only — it does
+  **not** reintroduce the double-publish bug from `v1.0.2`, because `dist` still runs
+  with `--publish never`, which overrides any publish policy regardless of config.
 - `preview.html` is the tray **Preview…** window: `tools/engine-source.html`'s own demo
   panel (seek bar 0–1440 min, temperature slider, scene dropdown, rain toggle, play/
   real-time/live-weather buttons) was already exactly the "scrub the day and test
@@ -221,6 +230,8 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - ✅ Tray **About…** window (app info + live GitHub developer card).
 - ✅ Tray **Preview…** window — 24h seek bar, temperature slider, scene picker, rain
   toggle, so users can check the animation/weather without waiting for real time.
+- ✅ Auto-update from GitHub Releases (`electron-updater`), confirmation-gated, tray
+  **Check for Updates…** for a manual check.
 - ✅ README has a download badge, build-status badge, and a screenshot gallery
   (`assets/screenshots/`, excluded from the packaged app via `build.files`).
 
@@ -275,6 +286,17 @@ guess:
   `LivingWallpaper-Lively.zip`** on every run — regenerates `lively/index.html` from the
   current engine, zips it, and attaches it to the tagged Release next to the `.exe` — so
   the Lively pack can never drift out of sync with the standalone app again.
+- **`v1.0.5` — two feature requests, no bug fixes.** Tray **Preview…** window: rather
+  than build a new scrub-the-day UI, `tools/build-wallpaper.js` now also ships
+  `tools/engine-source.html`'s existing demo panel as `src/preview.html` (just
+  retitled) — it already had exactly the seek bar / temperature slider / scene picker /
+  rain toggle that was asked for. And **auto-update**: `electron-updater` checks GitHub
+  Releases on launch, every 6h, and on demand (tray **Check for Updates…**); download
+  and restart-to-install are each gated behind a confirmation dialog, nothing happens
+  silently. Needed `build.publish` (owner/repo) added to `package.json` purely as
+  metadata for the packaged app to know where to check — confirmed this doesn't
+  resurrect the `v1.0.2` double-publish bug because `--publish never` on the `dist`
+  script overrides any publish policy regardless of that config being present.
 
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so
@@ -294,8 +316,8 @@ guess:
 - ⬜ **Performance** — FPS cap / lower-power mode on battery; pause when display sleeps.
 - ⬜ **Android app** — the original goal. Reuse the canvas engine in a `WallpaperService`
   via a WebView, or port `draw()` to Kotlin/Canvas. Weather/location layer reusable.
-- ⬜ **Distribution** — Microsoft Store / winget listing; auto-update via electron-builder
-  (`latest.yml` already produced by the release job).
+- ⬜ **Distribution** — Microsoft Store / winget listing. (Auto-update is already done —
+  see §6.)
 
 ## 8. Gotchas / lessons learned
 - `src/wallpaper.html` & `lively/index.html` are **generated** — edit `tools/` sources.

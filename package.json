@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "electron-as-wallpaper": "^2.0.3",
+    "electron-updater": "^6.3.9",
     "koffi": "^2.9.0"
   },
   "devDependencies": {
@@ -35,6 +36,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "include": "nsis/installer.nsh"
-    }
+    },
+    "publish": { "provider": "github", "owner": "adnaanaeem", "repo": "living-wallpaper" }
   }
 }

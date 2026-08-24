@@ -120,8 +120,15 @@ Output lands in `dist/` (an NSIS installer). For a quick unpacked build use `npm
 - **Pause / Resume** — stop rendering to save power
 - **Reload wallpaper** — re-attach after display changes
 - **Start with Windows** — toggle autostart
+- **Check for Updates…** — manually check GitHub Releases for a newer version
 - **About…** — version, description, and developer info (pulled from GitHub)
 - **Quit**
+
+### Auto-update
+The installed app checks GitHub Releases for a newer version on launch and every 6
+hours. If one's found, it asks before downloading, then asks again before restarting to
+install — nothing happens without confirmation. Only applies to the installed `.exe`,
+not `npm start`.
 
 ---
 

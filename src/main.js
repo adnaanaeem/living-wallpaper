@@ -12,6 +12,13 @@ let wallpaperLib = null;
 try { wallpaperLib = require('electron-as-wallpaper'); }
 catch (e) { console.warn('[main] electron-as-wallpaper not available:', e.message); }
 
+// Checks GitHub Releases (via the "publish" config baked in at build time) for a
+// newer version. Only meaningful in a packaged install — there's nothing to update
+// when running from source with `npm start`.
+let autoUpdater = null;
+try { autoUpdater = require('electron-updater').autoUpdater; autoUpdater.autoDownload = false; }
+catch (e) { console.warn('[main] electron-updater not available:', e.message); }
+
 let cfg = null;
 let wpWindows = [];      // wallpaper BrowserWindows (one per targeted display)
 let settingsWin = null;
@@ -33,6 +40,9 @@ function init() {
   createWallpaperWindows();
   createTray();
   startPausePolling();
+  setupAutoUpdater();
+  checkForUpdates(false);
+  setInterval(() => checkForUpdates(false), 6 * 60 * 60 * 1000); // every 6h
 }
 
 // ---- choose the surface(s) to cover ----
@@ -122,6 +132,39 @@ function startPausePolling() {
   }, 3000);
 }
 
+// ---- auto-update (GitHub Releases) ----
+function setupAutoUpdater() {
+  if (!autoUpdater) return;
+  autoUpdater.on('update-available', (info) => {
+    dialog.showMessageBox({
+      type: 'info', buttons: ['Download', 'Later'], defaultId: 0, cancelId: 1,
+      title: 'Update available',
+      message: 'Living Wallpaper ' + info.version + ' is available (you have ' + app.getVersion() + ').',
+      detail: 'Download it now? It installs the next time you restart the app.'
+    }).then((r) => { if (r.response === 0) autoUpdater.downloadUpdate(); });
+  });
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox({
+      type: 'info', buttons: ['Restart now', 'Later'], defaultId: 0, cancelId: 1,
+      title: 'Update ready',
+      message: 'The update has been downloaded. Restart now to install it?'
+    }).then((r) => { if (r.response === 0) autoUpdater.quitAndInstall(); });
+  });
+  autoUpdater.on('error', (e) => console.warn('[updater]', e.message));
+}
+
+function checkForUpdates(manual) {
+  if (!autoUpdater || !app.isPackaged) {
+    if (manual) dialog.showMessageBox({ type: 'info', title: 'Check for updates',
+      message: 'Updates are only available in the installed app, not when running from source.' });
+    return;
+  }
+  autoUpdater.checkForUpdates().catch((e) => {
+    if (manual) dialog.showMessageBox({ type: 'error', title: 'Check for updates',
+      message: 'Could not check for updates.', detail: e.message });
+  });
+}
+
 // ---- tray ----
 function createTray() {
   const icon = trayIcon();
@@ -142,6 +185,7 @@ function rebuildTrayMenu() {
     { label: 'Start with Windows', type: 'checkbox', checked: !!cfg.autostart,
       click: (mi) => { cfg.autostart = mi.checked; config.save(cfg); applyAutostart(); } },
     { type: 'separator' },
+    { label: 'Check for Updates…', click: () => checkForUpdates(true) },
     { label: 'About…', click: openAbout },
     { label: 'Quit', click: () => { destroyWallpaperWindows(); tray.destroy(); app.exit(0); } }
   ]);
