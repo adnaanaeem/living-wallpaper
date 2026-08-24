@@ -306,6 +306,28 @@ guess:
   script overrides any publish policy regardless of that config being present.
 - (Repo/docs only, not a tagged release) **Public live demo via GitHub Pages** —
   `docs/index.html`, linked from the README's "Try the live demo" badge/link.
+- **`v1.0.6` — auto-update from `v1.0.5` was silently broken, found while verifying the
+  release rather than by a user report.** Two compounding bugs: (1) the release-publish
+  step's `files:` glob never included `dist/*.blockmap` (only the CI artifact upload
+  did), so `electron-updater`'s NSIS differential-update file was never actually on the
+  GitHub Release; (2) worse, the installer's `latest.yml` referenced
+  `Living-Wallpaper-Setup-1.0.5.exe` (hyphens — electron-builder sanitizes the `url:`
+  field), but the real file on disk was `Living Wallpaper Setup 1.0.5.exe` (spaces —
+  the unmodified default `artifactName`), and GitHub itself renamed it a **third** way on
+  upload (`Living.Wallpaper.Setup.1.0.5.exe` — GitHub replaces spaces in asset names
+  with dots). Three different names for one file meant `electron-updater` could never
+  have found the installer to download, on any release up through `v1.0.5`. Fixed by
+  setting `nsis.artifactName` to a fixed, space-free, **unversioned**
+  `"Living-Wallpaper-Setup.exe"` — this makes electron-builder generate the exe and
+  `latest.yml` with the exact same name every time (no more 3-way mismatch), and as a
+  bonus gives the README a permanently stable direct-download link that survives every
+  version bump: `.../releases/latest/download/Living-Wallpaper-Setup.exe`. Also added
+  `dist/*.blockmap` to the release `files:` glob. **This means auto-update was
+  non-functional in `v1.0.5` — don't rely on it having worked before `v1.0.6`.**
+  README's download badges were also switched from linking the releases page to linking
+  the asset directly (`.../releases/latest/download/<name>`) — one badge for the
+  installer, one for the Lively zip (`LivingWallpaper-Lively.zip`, already unversioned
+  so no change needed there).
 
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so
@@ -354,6 +376,14 @@ guess:
   **must be a `<label>`**, not a bare `<span>` — otherwise clicking the visible switch
   never reaches the checkbox and `onchange` never fires. All three toggles were broken
   this way before being fixed.
+- **`nsis.artifactName` must stay a fixed, space-free string** (currently
+  `"Living-Wallpaper-Setup.exe"`, no `${version}`). electron-builder's `latest.yml`
+  sanitizes spaces to hyphens in its `url:`/`path:` fields but does **not** rename the
+  actual output file to match, and GitHub separately sanitizes spaces to dots on
+  upload — so a space-containing artifactName produces three different filenames for
+  the same file and silently breaks `electron-updater` (see `v1.0.6` in §6.1). Leaving
+  it unversioned is also what makes the README's direct-download link permanent instead
+  of needing an edit every release.
 - `package.json`'s `dist` script must keep `--publish never`. Because `package.json` has
   a `repository` field and CI sets `GH_TOKEN`, electron-builder's default
   `onTagOrDraft` publish policy will otherwise auto-publish the GitHub Release **itself**
