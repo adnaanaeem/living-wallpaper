@@ -69,9 +69,9 @@ LivingWallpaper/
    └─ package.json       ← tooling deps (@napi-rs/canvas, png-to-ico, gif-encoder-2)
 ```
 
-> **Generated files:** `src/wallpaper.html`, `lively/index.html`, and `src/preview.html`
-> are produced by `tools/build-wallpaper.js`. Never edit them directly — edit
-> `tools/engine-source.html` and/or `tools/prod-boot.js`, then re-run the build.
+> **Generated files:** `src/wallpaper.html`, `lively/index.html`, `src/preview.html`, and
+> `docs/index.html` are produced by `tools/build-wallpaper.js`. Never edit them directly
+> — edit `tools/engine-source.html` and/or `tools/prod-boot.js`, then re-run the build.
 
 ---
 
@@ -147,6 +147,12 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
   weather" UI end users want, so `build-wallpaper.js` ships it as-is (just retitled) —
   no IPC bridge, no preload, self-contained like the dev demo. It's a normal resizable
   window (not attached behind icons) and doesn't touch `cfg`/the real wallpaper windows.
+- `docs/index.html` is the **public live demo** — the same panel again, retitled, plus a
+  small "View on GitHub / Download" link since visitors may land here from search or a
+  shared link, not just the README. Served by **GitHub Pages** ("deploy from branch",
+  `main` / `/docs` — no Actions workflow needed; Pages redeploys on its own whenever
+  `docs/` changes on `main`) at `https://adnaanaeem.github.io/living-wallpaper/`.
+  `docs/.nojekyll` skips GitHub's default Jekyll processing.
 
 ### 3.4 Native dependency note (important)
 `electron-as-wallpaper@^2` compiles a **Rust (Neon / N-API)** module at `npm install`.
@@ -232,6 +238,7 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
   toggle, so users can check the animation/weather without waiting for real time.
 - ✅ Auto-update from GitHub Releases (`electron-updater`), confirmation-gated, tray
   **Check for Updates…** for a manual check.
+- ✅ Public live demo on GitHub Pages (`docs/index.html`), linked from the README.
 - ✅ README has a download badge, build-status badge, and a screenshot gallery
   (`assets/screenshots/`, excluded from the packaged app via `build.files`).
 
@@ -297,6 +304,8 @@ guess:
   metadata for the packaged app to know where to check — confirmed this doesn't
   resurrect the `v1.0.2` double-publish bug because `--publish never` on the `dist`
   script overrides any publish policy regardless of that config being present.
+- (Repo/docs only, not a tagged release) **Public live demo via GitHub Pages** —
+  `docs/index.html`, linked from the README's "Try the live demo" badge/link.
 
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so

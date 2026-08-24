@@ -1,6 +1,7 @@
 # Living Wallpaper (Windows)
 
 [![Download latest release](https://img.shields.io/github/v/release/adnaanaeem/living-wallpaper?style=for-the-badge&label=Download&logo=windows&logoColor=white&color=2f7d3c)](https://github.com/adnaanaeem/living-wallpaper/releases/latest)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-try_it_in_your_browser-6ea8fe?style=for-the-badge&logo=googlechrome&logoColor=white)](https://adnaanaeem.github.io/living-wallpaper/)
 [![Build status](https://img.shields.io/github/actions/workflow/status/adnaanaeem/living-wallpaper/build.yml?branch=main&style=for-the-badge&label=build)](https://github.com/adnaanaeem/living-wallpaper/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
 
@@ -12,6 +13,10 @@ A live desktop wallpaper: one scene that moves through **sunrise → noon → su
 in real time, with **live rain/snow**, **temperature-driven visuals** (snow caps, frost,
 heat-haze), an on-screen **weather panel** (auto location by IP, powered by Open-Meteo),
 and an option to **relight your own photo** through the day.
+
+**[Try the live demo →](https://adnaanaeem.github.io/living-wallpaper/)** — scrub the full
+24-hour cycle with a seek bar, switch scenes, and test rain/snow at any temperature,
+right in your browser. No install needed.
 
 ![Mountains scene at golden hour with the live weather panel](assets/screenshots/hero-mountains-hud.jpg)
 
