@@ -13,68 +13,6 @@ to your drive and keep going.
 
 ---
 
-## 0. Pick up here — mid-flight, not yet released
-
-Everything below is **committed and pushed to `main`** (as of commit `253428f`,
-2026-08-24 ~20:15). Working tree is clean. **Nothing is tagged/released yet** — `v1.0.6`
-is the next tag and will bundle all of this in one release. `package.json` is already
-bumped to `1.0.6`.
-
-**What's done and verified working** (tested live in a browser via the
-`.claude/launch.json` `scene-demo` static server — `node tools/build-wallpaper.js`,
-then `python -m http.server 8934`, navigate to `/tools/engine-source.html`, drive
-`SCENE`/`minutes`/`temperature`/`liveWeather` globals directly via the JS console,
-force a few `draw()` calls, screenshot the canvas — see §8 for why `computer`
-screenshot doesn't work headlessly and the `canvas.toDataURL()` workaround):
-
-1. **Auto-update filename fix** (commit `57dc415`) — `nsis.artifactName` pinned to
-   `Living-Wallpaper-Setup.exe`, `dist/*.blockmap` added to the release `files:` glob.
-   README download badges switched to direct asset links. Full root-cause writeup in
-   §6.1 under `v1.0.6`.
-2. **Rare weather events** — shooting stars (clear nights) and a rainbow after rain
-   tapers off in daylight. Confirmed rendering; rainbow alpha was tuned up once
-   (0.16 → 0.32 per band) after the first test render looked too faint.
-3. **Ambient audio** — procedural Web Audio (no asset files), off by default, toggle
-   wired through Settings/Lively/config. Confirmed the toggle flips `Sound.isEnabled()`
-   without throwing; **not** confirmed to actually produce audible sound in a real
-   packaged build yet (couldn't hear it from this environment) — worth a real listen
-   after the next install.
-4. **Three new scenes** — Forest, Aurora, Snowy Village. Confirmed all three render
-   correctly with no console errors, including at night/with snow/with the HUD.
-
-**What's NOT done yet — do these in order:**
-
-1. **Scene thumbnails.** `src/settings.html`'s scene picker now references
-   `assets/scenes/forest.jpg`, `assets/scenes/aurora.jpg`, `assets/scenes/village.jpg` —
-   **none of these three files exist yet.** Until they're added, those three tiles in
-   Settings show broken images (functionally fine, just ugly). Generate them the same
-   way the screenshots in `assets/screenshots/` were made this session: drive the demo
-   canvas via the console (no HUD needed — the existing `mountains.jpg` etc. are plain
-   scene shots, 360×203, JPEG ~q85), e.g. for forest: `SCENE='forest'; minutes=1100;
-   temperature=18;` then force-draw and `canvas.toDataURL('image/jpeg',0.85)`. Resize to
-   360×203 to match the existing four (`assets/scenes/mountains.jpg` etc.) — use PIL
-   (`python -c "from PIL import Image; ..."`, confirmed available in this environment)
-   or equivalent. Pick a flattering moment per scene: forest at golden hour or with
-   fireflies at night, aurora at night (its whole point), village at dusk/night with
-   windows lit.
-2. **Commit the thumbnails.**
-3. **Tag `v1.0.6` and push it**, wait for the release build, then verify with
-   `gh release view v1.0.6` that the installer is named exactly
-   `Living-Wallpaper-Setup.exe` (no version, no spaces/dots), and that `.blockmap`,
-   `latest.yml`, and `LivingWallpaper-Lively.zip` are all attached. Then sanity-check
-   the README's direct-download links actually resolve:
-   `curl -IL https://github.com/adnaanaeem/living-wallpaper/releases/latest/download/Living-Wallpaper-Setup.exe`
-   should end in `200`, not `404`.
-4. **Trailer GIF/video for the README and social sharing** — asked for, not started.
-   `tools/gen-preview.js` already exists (uses `@napi-rs/canvas` + `gif-encoder-2` from
-   `tools/package.json`, needs `cd tools && npm install` first) and generates
-   `lively/preview.gif`, a short single-scene loop. A "trailer" would want to be a bit
-   longer/punchier and probably cycle through 2-3 scenes — either extend that script or
-   write a sibling one. Reasonable to just build and ship everything else first, then
-   circle back to this since it's the most open-ended piece.
-
----
-
 ## 1. Two ways it ships
 
 | | Standalone app (`src/`) | Lively pack (`lively/`) |
@@ -299,7 +237,12 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - ✅ Day-cycle engine (sky, sun/moon arc, stars/Milky Way, clouds) with realistic grading.
 - ✅ Live rain + snow (temperature-based), snow cover, frost, heat-haze, cold/warm grade.
 - ✅ Live weather + HUD (IP location, Open-Meteo), 12/24h clock, °C/°F, km/h/mph.
-- ✅ Four scenes + Rotate/Random; thumbnail picker in settings; scene dropdown in Lively.
+- ✅ Seven scenes (Mountains, City, Beach, Desert, Forest, Aurora, Snowy Village) +
+  Rotate/Random; thumbnail picker in settings; scene dropdown in Lively.
+- ✅ Rare weather delights — shooting stars on clear nights, a rainbow that fades in
+  after rain tapers off in daylight and fades back out over a minute or two.
+- ✅ Optional ambient audio — procedural rain/wind/cricket sound (no asset files), off
+  by default, toggle in Settings/Lively/config.
 - ✅ Photo relight (single) + multi-photo day cross-fade.
 - ✅ Standalone Electron app: WorkerW attach, tray, settings, autostart, multi-monitor
   (one window per display), game-pause.
@@ -326,8 +269,10 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - ✅ Auto-update from GitHub Releases (`electron-updater`), confirmation-gated, tray
   **Check for Updates…** for a manual check.
 - ✅ Public live demo on GitHub Pages (`docs/index.html`), linked from the README.
-- ✅ README has a download badge, build-status badge, and a screenshot gallery
-  (`assets/screenshots/`, excluded from the packaged app via `build.files`).
+- ✅ README has direct-download badges (installer + Lively zip), a build-status badge,
+  a 10s trailer GIF (`assets/trailer.gif`, cycles all 7 scenes with the HUD, captured
+  from the real engine), and a 7-image screenshot gallery (`assets/screenshots/`,
+  excluded from the packaged app via `build.files`).
 
 ### 6.1 Release history — what shipped and how
 
@@ -416,13 +361,39 @@ guess:
   installer, one for the Lively zip (`LivingWallpaper-Lively.zip`, already unversioned
   so no change needed there).
 
+  Also landed in the same `v1.0.6` push (built on the `main` branch, then tagged and
+  verified once the build was green): the **rare weather events** (shooting stars,
+  post-rain rainbow), **ambient audio** (procedural `Sound` object — see §3.1/§3.3 for
+  the `autoplay-policy` command-line switch it needs), and the **three new scenes**
+  (Forest, Aurora, Snowy Village) with their settings-picker thumbnails. Also fixed in
+  this push: the scene `<select>`'s popup list was unreadable — `.btn`'s background is
+  a mostly-transparent `rgba(255,255,255,0.06)`, fine for the closed control against the
+  page's dark background, but the native OS popup list falls back to the browser's own
+  white background while keeping the light option text, making it nearly invisible.
+  Fixed with an explicit opaque dark `background`/`color` on `<option>` (see §8).
+  **Verified end-to-end after tagging**: `gh release view v1.0.6` showed all four assets
+  (`Living-Wallpaper-Setup.exe`, `.blockmap`, `latest.yml`, `LivingWallpaper-Lively.zip`)
+  with `latest.yml`'s `url:` matching the actual asset name exactly, and both README
+  direct-download links resolved `302 → 200` via `curl -IL`.
+- (Repo/docs only, landed on `main` right after `v1.0.6`, no new tag needed since the
+  packaged app didn't change) **Trailer GIF + expanded screenshot gallery.** A ~10s,
+  7-frame animated GIF (`assets/trailer.gif`) cycling Mountains (sunset) → City (rainy
+  night) → Beach (noon) → Desert (heat-haze) → Forest (fireflies) → Aurora → Snowy
+  Village (snowfall), each frame captured from the *actual* engine (not a simplified
+  reimplementation) with the real weather HUD composited in via the SVG `foreignObject`
+  technique (see §8), then assembled with Pillow (`Image.save(..., save_all=True,
+  duration=1400, loop=0)`). Replaced the static hero screenshot as the README's top
+  visual. Also added dedicated `assets/screenshots/` shots for Forest/Aurora/Village,
+  extending the gallery to all seven scenes; the now-unused `hero-mountains-hud.jpg` was
+  deleted.
+
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so
   SmartScreen stops warning. (Workflow is structured to drop this in.)
 - ⬜ **Per-scene Lively previews** — not possible inside Lively's Customize dialog;
   consider a standalone "Scene Gallery" HTML so Lively users can preview before picking.
-- ⬜ **More scenes** — Forest/Hills, Countryside, Snowy village, Aurora (night), Rainforest.
-  Add via the 5-step recipe in `tools/README.md`.
+- ⬜ **More scenes** — Countryside, Rainforest. (Forest, Aurora, and Snowy Village have
+  shipped — see §6.) Add via the 5-step recipe in `tools/README.md`.
 - ⬜ **Richer weather visuals** — fog banks, lightning flashes in storms, wind-driven rain
   angle, falling leaves (autumn), pollen/dust in heat, lake/ground icing when freezing.
 - ⬜ **Weather-code driven scene mood** — use Open-Meteo `weather_code` (fog/overcast/
@@ -477,9 +448,27 @@ guess:
   on a tag push, uploading the installer a second time under its own sanitized filename
   (dots instead of hyphens) alongside the workflow's explicit release step — same file,
   two names, one release.
+- **`<option>` elements need their own explicit `background`/`color`.** A `<select>`
+  styled with a translucent background (`.btn`'s `rgba(255,255,255,0.06)`) looks fine
+  closed, because it composites over the page, but the native OS popup list isn't part
+  of the page — it falls back to the browser's own (usually white) background while
+  still inheriting the light text color, making the options unreadable. Set
+  `select.btn option { background: #141a2b; color: #e8edf5; }` explicitly.
+- **Screenshotting the engine headlessly:** the canvas draws fine via automation, but
+  `draw()`'s `dt` (elapsed-time) smoothing means values like `rainLevel` don't snap to a
+  new scene's target — they decay/ramp over real elapsed time. Setting `rainOn=false`
+  right after a heavy-rain scene can leave visible rain/snow-state artifacts in the next
+  capture unless you also zero `rainLevel`/`prevRainLevel`/`rainbowLevel` directly, or
+  just do a full page reload between captures. The `#hud` weather card is a DOM overlay,
+  not canvas content — compositing it into a screenshot means cloning it, inlining its
+  computed styles, wrapping in an SVG `foreignObject`, and drawing that onto a copy of
+  the canvas (see the `assets/screenshots/` and `assets/trailer.gif` capture history in
+  §6.1 for the working recipe). Also call `syncUI()`/`updateHUD()` after changing
+  `SCENE`/`minutes`/`liveWeather` — the canvas picks up new values on the next `draw()`,
+  but the HUD's DOM text doesn't refresh until those are called explicitly.
 
 ## 9. Continuing with Claude
-Point Claude at this file first. Good next asks: "add a Forest scene", "add fog + lightning
-to storms", "compute real sunrise/sunset from location", "wire code signing into CI",
-"start the Android WallpaperService port". Always run `node tools/build-wallpaper.js`
-after engine/prod-boot edits.
+Point Claude at this file first. Good next asks: "add fog + lightning to storms",
+"compute real sunrise/sunset from location", "add a Countryside or Rainforest scene",
+"wire code signing into CI", "start the Android WallpaperService port". Always run
+`node tools/build-wallpaper.js` after engine/prod-boot edits.
