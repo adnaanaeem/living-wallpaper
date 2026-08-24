@@ -1,0 +1,54 @@
+// Simple JSON config persisted in the app's userData folder.
+const fs = require('fs');
+const path = require('path');
+const { app } = require('electron');
+
+const DEFAULTS = {
+  units:      { temp: 'C', wind: 'kmh' }, // 'C'|'F', 'kmh'|'mph'
+  clock:      '12',        // '12' or '24' hour clock
+  scene:      'mountains', // mountains|city|beach|desert|rotate|random
+  showHud:    true,
+  photo:      null,        // absolute path to a single image, or null
+  photos:     null,        // ordered array of image paths for day cross-fade, or null
+  location:   null,        // { lat, lon, name } or null => auto (IP)
+  monitor:    'all',       // 'all' or a display id (number as string)
+  autostart:  false,
+  pauseOnFullscreen: true
+};
+
+function file() {
+  return path.join(app.getPath('userData'), 'config.json');
+}
+
+function load() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(file(), 'utf8'));
+    return Object.assign({}, DEFAULTS, raw);
+  } catch (e) {
+    return Object.assign({}, DEFAULTS);
+  }
+}
+
+function save(cfg) {
+  try {
+    fs.writeFileSync(file(), JSON.stringify(cfg, null, 2));
+  } catch (e) { /* ignore */ }
+  return cfg;
+}
+
+// Shape passed into the renderer (photo path -> file URL).
+function toUrl(p) { return 'file:///' + p.replace(/\\/g, '/'); }
+function toRenderer(cfg) {
+  return {
+    units:    cfg.units,
+    clock:    cfg.clock,
+    scene:    cfg.scene,
+    showHud:  cfg.showHud,
+    photo:    cfg.photo ? toUrl(cfg.photo) : null,
+    photos:   (cfg.photos && cfg.photos.length) ? cfg.photos.map(toUrl) : null,
+    location: cfg.location,
+    theme:    'auto'
+  };
+}
+
+module.exports = { DEFAULTS, load, save, toRenderer };

@@ -1,0 +1,39 @@
+{
+  "name": "living-wallpaper",
+  "productName": "Living Wallpaper",
+  "version": "1.0.0",
+  "description": "Live day-cycle & weather desktop wallpaper for Windows",
+  "author": { "name": "adnaanaeem", "email": "jbsia.dani@gmail.com" },
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/adnaanaeem/living-wallpaper.git" },
+  "homepage": "https://github.com/adnaanaeem/living-wallpaper",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "pack": "electron-builder --dir"
+  },
+  "dependencies": {
+    "electron-as-wallpaper": "^2.0.3",
+    "koffi": "^2.9.0"
+  },
+  "devDependencies": {
+    "electron": "^31.7.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.salman.livingwallpaper",
+    "productName": "Living Wallpaper",
+    "files": [ "src/**/*", "assets/**/*" ],
+    "win": {
+      "target": [ { "target": "nsis", "arch": [ "x64" ] } ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

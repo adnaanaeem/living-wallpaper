@@ -1,0 +1,47 @@
+{
+  "showHud": {
+    "text": "Show weather panel",
+    "type": "checkbox",
+    "value": true
+  },
+  "units": {
+    "text": "Temperature units",
+    "type": "dropdown",
+    "items": [ "Celsius", "Fahrenheit" ],
+    "value": 0
+  },
+  "clock": {
+    "text": "Clock format",
+    "type": "dropdown",
+    "items": [ "12-hour", "24-hour" ],
+    "value": 0
+  },
+  "scene": {
+    "text": "Illustrated scene",
+    "type": "dropdown",
+    "items": [ "Mountains & Lake", "City Skyline", "Ocean / Beach", "Desert Dunes", "Rotate daily", "Random each launch" ],
+    "value": 0
+  },
+  "cityName": {
+    "text": "City label (optional)",
+    "type": "textbox",
+    "value": ""
+  },
+  "photoLabel": {
+    "text": "Own photo background: tick the box below, then in 'Photo background' click the folder/＋ button to add your image (it gets copied into the wallpaper and displayed).",
+    "type": "label",
+    "value": ""
+  },
+  "usePhoto": {
+    "text": "Use photo background",
+    "type": "checkbox",
+    "value": false
+  },
+  "photo": {
+    "text": "Photo background",
+    "type": "folderDropdown",
+    "filter": "*.jpg|*.jpeg|*.png|*.webp|*.bmp",
+    "folder": "backgrounds",
+    "value": ""
+  }
+}

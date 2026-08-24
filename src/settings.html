@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Living Wallpaper — Settings</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#0f1524; color:#e8edf5; padding:20px; }
+  h1 { font-size:16px; margin:0 0 4px; }
+  .sub { font-size:12px; opacity:0.55; margin-bottom:18px; }
+  .card { background:#161d2e; border:1px solid #232c42; border-radius:14px; padding:14px 16px; margin-bottom:14px; }
+  .card h2 { font-size:12px; text-transform:uppercase; letter-spacing:1px; opacity:0.6; margin:0 0 12px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 0; }
+  .row label { font-size:14px; }
+  select, input[type=text] { background:#0f1524; color:#e8edf5; border:1px solid #2b3550;
+    border-radius:9px; padding:8px 10px; font-size:13px; min-width:150px; }
+  input[type=text] { flex:1; min-width:0; }
+  .seg { display:flex; border:1px solid #2b3550; border-radius:9px; overflow:hidden; }
+  .seg button { background:#0f1524; color:#cdd6e6; border:0; padding:8px 14px; font-size:13px; cursor:pointer; }
+  .seg button.active { background:#2b60c8; color:#fff; }
+  .switch { position:relative; width:44px; height:24px; }
+  .switch input { display:none; }
+  .track { position:absolute; inset:0; background:#2b3550; border-radius:99px; transition:.15s; }
+  .track::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:.15s; }
+  .switch input:checked + .track { background:#3DDC84; }
+  .switch input:checked + .track::after { transform:translateX(20px); }
+  .btn { background:#2b60c8; color:#fff; border:0; border-radius:9px; padding:9px 14px; font-size:13px; cursor:pointer; }
+  .btn.ghost { background:#222c42; }
+  .photoName { font-size:12px; opacity:0.6; margin-top:6px; word-break:break-all; }
+  .foot { display:flex; justify-content:flex-end; gap:10px; margin-top:6px; }
+  .loc-row { display:flex; gap:8px; }
+  #map { height:200px; border-radius:10px; overflow:hidden; margin-top:10px; border:1px solid #2b3550; }
+  .leaflet-container { background:#0b1120; }
+  .maphint { font-size:11px; opacity:0.5; margin-top:6px; }
+  .sceneGrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .sceneCard { position:relative; border-radius:10px; overflow:hidden; cursor:pointer;
+    border:2px solid transparent; background:#0f1524; }
+  .sceneCard img { width:100%; height:74px; object-fit:cover; display:block; }
+  .sceneCard span { position:absolute; left:0; right:0; bottom:0; padding:4px 6px; font-size:11px;
+    background:linear-gradient(transparent, rgba(0,0,0,.7)); }
+  .sceneCard.active { border-color:#3DDC84; }
+  .sceneCard.active::after { content:"✓"; position:absolute; top:4px; right:6px; color:#3DDC84; font-weight:700; text-shadow:0 1px 3px #000; }
+</style>
+</head>
+<body>
+  <h1>Living Wallpaper</h1>
+  <div class="sub">Live day-cycle & weather wallpaper</div>
+
+  <div class="card">
+    <h2>Background</h2>
+    <div style="font-size:14px;margin-bottom:8px">Illustrated scene</div>
+    <div class="sceneGrid" id="sceneGrid">
+      <div class="sceneCard" data-v="mountains"><img src="../assets/scenes/mountains.jpg" alt=""><span>Mountains &amp; Lake</span></div>
+      <div class="sceneCard" data-v="city"><img src="../assets/scenes/city.jpg" alt=""><span>City Skyline</span></div>
+      <div class="sceneCard" data-v="beach"><img src="../assets/scenes/beach.jpg" alt=""><span>Ocean / Beach</span></div>
+      <div class="sceneCard" data-v="desert"><img src="../assets/scenes/desert.jpg" alt=""><span>Desert Dunes</span></div>
+    </div>
+    <div class="seg" id="segScene" style="margin-top:8px">
+      <button data-v="rotate">🔁 Rotate daily</button>
+      <button data-v="random">🎲 Random each launch</button>
+    </div>
+    <div class="photoName" style="opacity:.45">Scenes show when no photo is set.</div>
+    <div class="row">
+      <label>Single photo</label>
+      <button class="btn" id="pickPhoto">Choose…</button>
+    </div>
+    <div class="row">
+      <label>Day cross-fade (multiple)</label>
+      <button class="btn" id="pickPhotos">Choose photos…</button>
+    </div>
+    <div class="row">
+      <label>&nbsp;</label>
+      <button class="btn ghost" id="clearPhoto">Use illustrated scene</button>
+    </div>
+    <div class="photoName" id="photoName">Illustrated scene (no photo)</div>
+    <div class="photoName" style="opacity:.45">Tip: for the cross-fade, pick photos of the same view in time order (e.g. dawn, noon, dusk, night). They're spaced evenly across the day and blended as the clock moves.</div>
+  </div>
+
+  <div class="card">
+    <h2>Weather & Units</h2>
+    <div class="row">
+      <label>Temperature</label>
+      <div class="seg" id="segTemp">
+        <button data-v="C" class="active">°C</button>
+        <button data-v="F">°F</button>
+      </div>
+    </div>
+    <div class="row">
+      <label>Wind</label>
+      <div class="seg" id="segWind">
+        <button data-v="kmh" class="active">km/h</button>
+        <button data-v="mph">mph</button>
+      </div>
+    </div>
+    <div class="row">
+      <label>Clock</label>
+      <div class="seg" id="segClock">
+        <button data-v="12" class="active">12-hour</button>
+        <button data-v="24">24-hour</button>
+      </div>
+    </div>
+    <div class="row"><label>Location</label></div>
+    <div class="loc-row">
+      <input type="text" id="cityInput" placeholder="Auto (by IP) — or type a city">
+      <button class="btn" id="setCity">Set</button>
+      <button class="btn ghost" id="autoLoc">Auto</button>
+    </div>
+    <div id="map"></div>
+    <div class="maphint">Click anywhere on the map to set your location. “Auto” goes back to IP-based.</div>
+    <div class="photoName" id="locName">Using automatic location</div>
+  </div>
+
+  <div class="card">
+    <h2>Display & Behaviour</h2>
+    <div class="row">
+      <label>Show info panel</label>
+      <span class="switch"><input type="checkbox" id="showHud"><span class="track"></span></span>
+    </div>
+    <div class="row">
+      <label>Monitor</label>
+      <select id="monitor"><option value="all">All monitors</option></select>
+    </div>
+    <div class="row">
+      <label>Pause on fullscreen / games</label>
+      <span class="switch"><input type="checkbox" id="pauseFs"><span class="track"></span></span>
+    </div>
+    <div class="row">
+      <label>Start with Windows</label>
+      <span class="switch"><input type="checkbox" id="autostart"><span class="track"></span></span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button class="btn ghost" id="closeBtn">Close</button>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let cfg = null;
+
+  async function boot() {
+    cfg = await window.LW.getConfig();
+    window.__cfg = cfg;
+    render();
+    const displays = await window.LW.getDisplays();
+    const sel = $('monitor');
+    displays.forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.id; o.textContent = d.label + (d.primary ? ' — primary' : '');
+      sel.appendChild(o);
+    });
+    sel.value = cfg.monitor || 'all';
+  }
+
+  function render() {
+    setSeg('segTemp', cfg.units.temp);
+    setSeg('segWind', cfg.units.wind);
+    setSeg('segClock', cfg.clock || '12');
+    setScene(cfg.scene || 'mountains');
+    $('showHud').checked = !!cfg.showHud;
+    $('pauseFs').checked = !!cfg.pauseOnFullscreen;
+    $('autostart').checked = !!cfg.autostart;
+    $('photoName').textContent = (cfg.photos && cfg.photos.length)
+      ? (cfg.photos.length + ' photos — day cross-fade')
+      : (cfg.photo ? cfg.photo : 'Illustrated scene (no photo)');
+    $('locName').textContent = cfg.location ? ('Fixed: ' + (cfg.location.name || (cfg.location.lat + ', ' + cfg.location.lon))) : 'Using automatic location';
+    if (cfg.location && cfg.location.name) $('cityInput').value = cfg.location.name;
+  }
+
+  function setSeg(id, val) {
+    document.querySelectorAll('#' + id + ' button').forEach(b =>
+      b.classList.toggle('active', b.dataset.v === val));
+  }
+  function setScene(val) {
+    document.querySelectorAll('#sceneGrid .sceneCard').forEach(c =>
+      c.classList.toggle('active', c.dataset.v === val));
+    document.querySelectorAll('#segScene button').forEach(b =>
+      b.classList.toggle('active', b.dataset.v === val));
+  }
+
+  async function save(patch) { cfg = await window.LW.setConfig(patch); render(); }
+
+  document.querySelectorAll('#segTemp button').forEach(b =>
+    b.onclick = () => save({ units: Object.assign({}, cfg.units, { temp: b.dataset.v }) }));
+  document.querySelectorAll('#segWind button').forEach(b =>
+    b.onclick = () => save({ units: Object.assign({}, cfg.units, { wind: b.dataset.v }) }));
+  document.querySelectorAll('#segClock button').forEach(b =>
+    b.onclick = () => save({ clock: b.dataset.v }));
+
+  $('showHud').onchange = (e) => save({ showHud: e.target.checked });
+  $('pauseFs').onchange = (e) => save({ pauseOnFullscreen: e.target.checked });
+  $('autostart').onchange = (e) => save({ autostart: e.target.checked });
+  $('monitor').onchange = (e) => save({ monitor: e.target.value });
+  document.querySelectorAll('#sceneGrid .sceneCard').forEach(c =>
+    c.onclick = () => save({ scene: c.dataset.v }));
+  document.querySelectorAll('#segScene button').forEach(b =>
+    b.onclick = () => save({ scene: b.dataset.v }));
+
+  $('pickPhoto').onclick = async () => { cfg = await window.LW.pickPhoto(); render(); };
+  $('pickPhotos').onclick = async () => { cfg = await window.LW.pickPhotos(); render(); };
+  $('clearPhoto').onclick = async () => { cfg = await window.LW.clearPhoto(); render(); };
+
+  $('setCity').onclick = async () => {
+    const q = $('cityInput').value.trim();
+    if (!q) { await window.LW.setLocation(null); cfg = await window.LW.getConfig(); render(); return; }
+    const loc = await window.LW.geocode(q);
+    if (loc && map) { map.setView([loc.lat, loc.lon], 8); setMarker(loc.lat, loc.lon); }
+    $('locName').textContent = loc ? ('Fixed: ' + loc.name) : 'City not found — using automatic';
+    cfg = await window.LW.getConfig();
+  };
+  $('autoLoc').onclick = async () => {
+    await window.LW.setLocation(null);
+    if (marker && map) { map.removeLayer(marker); marker = null; }
+    cfg = await window.LW.getConfig(); render();
+  };
+
+  $('closeBtn').onclick = () => window.LW.close();
+  boot();
+</script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  let map = null, marker = null;
+
+  function setMarker(lat, lon) {
+    if (!map) return;
+    if (marker) marker.setLatLng([lat, lon]);
+    else marker = L.marker([lat, lon]).addTo(map);
+  }
+
+  async function reverseGeocode(lat, lon) {
+    try {
+      const r = await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='
+        + lat + '&longitude=' + lon + '&localityLanguage=en');
+      const j = await r.json();
+      const city = j.city || j.locality || j.principalSubdivision;
+      return city ? (city + (j.countryCode ? ', ' + j.countryCode : '')) : null;
+    } catch (e) { return null; }
+  }
+
+  function initMap() {
+    if (typeof L === 'undefined') return; // offline: map just won't show, rest works
+    const start = (window.__cfg && window.__cfg.location)
+      ? [window.__cfg.location.lat, window.__cfg.location.lon] : [20, 0];
+    const zoom = (window.__cfg && window.__cfg.location) ? 8 : 2;
+    map = L.map('map', { attributionControl: false, zoomControl: true }).setView(start, zoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+    if (window.__cfg && window.__cfg.location) setMarker(start[0], start[1]);
+
+    map.on('click', async (e) => {
+      const lat = +e.latlng.lat.toFixed(4), lon = +e.latlng.lng.toFixed(4);
+      setMarker(lat, lon);
+      const nm = document.getElementById('locName');
+      nm.textContent = 'Looking up place…';
+      const name = await reverseGeocode(lat, lon);
+      await window.LW.setLocation({ lat, lon, name: name || (lat + ', ' + lon) });
+      nm.textContent = 'Fixed: ' + (name || (lat + ', ' + lon));
+      const ci = document.getElementById('cityInput');
+      if (name) ci.value = name;
+    });
+  }
+
+  // wait until config is loaded by the first script, then init the map
+  (function waitCfg(n){
+    if (window.__cfg) return initMap();
+    if (n > 60) return initMap();
+    setTimeout(() => waitCfg(n + 1), 50);
+  })(0);
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "AppVersion": "2.0.0.0",
+  "Title": "Living Wallpaper — Day Cycle & Weather",
+  "Thumbnail": "thumbnail.jpg",
+  "Preview": "preview.gif",
+  "Desc": "A single scene that shifts through sunrise, noon, sunset and night in real time, with live rain/snow, temperature effects and an on-screen weather panel (auto location via IP, powered by Open-Meteo). Optionally relights your own photo.",
+  "Author": "Salman",
+  "License": "",
+  "Type": 1,
+  "IsAbsolutePath": false,
+  "FileName": "index.html",
+  "Contact": "",
+  "Arguments": ""
+}
