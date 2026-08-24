@@ -1,58 +1,54 @@
-# Publish to GitHub & build the .exe in the cloud
+# Push to GitHub & build the .exe in the cloud
 
-This project ships a GitHub Actions workflow (`.github/workflows/build.yml`) that
-builds the Windows installer on a `windows-latest` runner — so you get a `.exe`
-**without needing to build locally**. Artifacts are attached to each run, and
-pushing a version tag (e.g. `v1.0.0`) also publishes a GitHub **Release** with the
-installer attached.
+This folder is **already a git repository** with an initial commit made as
+**adnaanaeem `<jbsia.dani@gmail.com>`** on branch `main`. You just need to push it to
+your GitHub account — then GitHub Actions builds the Windows installer for you on a
+`windows-latest` runner (no local build, no Rust/Visual Studio needed on your PC).
 
-Account used below: **username `adnaanaeem`**, **email `jbsia.dani@gmail.com`**.
+## Fastest: run the helper script
+- **Windows:** double-click **`push.bat`** (or run it in a terminal).
+- **macOS/Linux:** `bash push.sh`
 
-## 1) One-time git identity (for this repo)
+The script uses the GitHub CLI if present (creates the repo and pushes in one step),
+otherwise it prints the two commands to finish manually.
+
+## Manual — GitHub CLI
 ```bash
-cd LivingWallpaper
-git init
-git config user.name  "adnaanaeem"
-git config user.email "jbsia.dani@gmail.com"
-git add .
-git commit -m "Living Wallpaper: initial commit"
-git branch -M main
-```
-
-## 2) Create the GitHub repo and push
-
-### Option A — GitHub CLI (easiest)
-Install the GitHub CLI (https://cli.github.com), then:
-```bash
-gh auth login                      # sign in as adnaanaeem
+gh auth login                 # sign in as adnaanaeem
 gh repo create living-wallpaper --public --source . --remote origin --push
 ```
 
-### Option B — Manual
-1. Create an empty repo at https://github.com/new named **living-wallpaper**
-   (owner: adnaanaeem). Do **not** add a README/license (this repo already has files).
+## Manual — plain git
+1. Create an **empty** repo at https://github.com/new
+   (owner **adnaanaeem**, name **living-wallpaper**, no README/license).
 2. Then:
 ```bash
 git remote add origin https://github.com/adnaanaeem/living-wallpaper.git
+git branch -M main
 git push -u origin main
 ```
 
-## 3) Watch the build
-- Go to the repo → **Actions** tab → the “Build Windows installer” run.
-- When it finishes, open the run → **Artifacts** → download `LivingWallpaper-windows`
-  (contains the `.exe`).
+## Watch the build / get the .exe
+- Repo → **Actions** tab → “Build Windows installer” run → **Artifacts** →
+  download `LivingWallpaper-windows` (contains the installer `.exe`).
+- For a public download link, cut a release:
+  ```bash
+  git tag v1.0.0 && git push origin v1.0.0
+  ```
+  The workflow attaches the installer to a Release automatically.
 
-## 4) Cut a release (optional, gives a public download link)
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-The workflow will build and attach the installer to a Release at
-`https://github.com/adnaanaeem/living-wallpaper/releases`.
+## How the CI build works (FYI)
+The wallpaper-behind-icons feature uses `electron-as-wallpaper`, which compiles a small
+**Rust (Neon / N-API)** native module at install time. The workflow therefore:
+1. sets up Node 20 **and the Rust toolchain**,
+2. runs `npm install` (compiles the native module — N-API means no electron-rebuild),
+3. runs `npm run dist` (electron-builder → NSIS installer in `dist/`).
+
+No secrets to configure — it uses the automatic `GITHUB_TOKEN`.
 
 ## Notes
-- No secrets to configure — the workflow uses the automatic `GITHUB_TOKEN`.
-- The build is **not code-signed**, so Windows SmartScreen may warn on first run
-  (“More info → Run anyway”). Code signing needs a paid certificate; ask if you want
-  that wired in later.
-- `node_modules/` and `dist/` are git-ignored; the runner installs and builds fresh.
+- **Local dev is optional.** If you *want* to run it on your own machine with
+  `npm start`, you'll need Node + the **Rust toolchain** + **VS Build Tools** (for the
+  native module). Most people can skip this and just download the CI `.exe`.
+- The build is **unsigned**, so SmartScreen may warn on first run (More info → Run anyway).
+  Real code signing needs a paid certificate — ask if you want it wired in.

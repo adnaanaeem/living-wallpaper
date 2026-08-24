@@ -1,0 +1,18 @@
+{
+  "name": "living-wallpaper-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Dev tooling: regenerate the wallpaper HTML, icons, thumbnails and preview.gif",
+  "scripts": {
+    "build": "node build-wallpaper.js",
+    "assets": "node gen-assets.js",
+    "thumbs": "node gen-scene-thumbs.js",
+    "preview": "node gen-preview.js",
+    "render": "node render-scenes.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "png-to-ico": "^2.1.8",
+    "gif-encoder-2": "^1.0.5"
+  }
+}

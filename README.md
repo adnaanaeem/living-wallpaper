@@ -1,5 +1,9 @@
 # Living Wallpaper (Windows)
 
+> **Developers:** read **`CLAUDE-HANDOFF.md`** first — it documents the architecture,
+> the `tools/` pipeline, the config schema, and the roadmap.
+
+
 A live desktop wallpaper: one scene that moves through **sunrise → noon → sunset → night**
 in real time, with **live rain/snow**, **temperature-driven visuals** (snow caps, frost,
 heat-haze), an on-screen **weather panel** (auto location by IP, powered by Open-Meteo),

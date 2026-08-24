@@ -1,6 +1,11 @@
 node_modules/
 dist/
 out/
+target/
+build/
+*.node
 *.log
 .DS_Store
 Thumbs.db
+tools/scene-*.png
+*.zip
