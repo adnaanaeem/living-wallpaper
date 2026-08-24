@@ -190,7 +190,7 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - ✅ Four scenes + Rotate/Random; thumbnail picker in settings; scene dropdown in Lively.
 - ✅ Photo relight (single) + multi-photo day cross-fade.
 - ✅ Standalone Electron app: WorkerW attach, tray, settings, autostart, multi-monitor
-  (spans extended desktop), game-pause.
+  (one window per display), game-pause.
 - ✅ Lively pack: manifest, properties, animated preview.gif, thumbnail, photo via
   folderDropdown, map-free city label.
 - ✅ Settings map location picker (Leaflet + OSM).
@@ -200,7 +200,10 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
   every build, attaching it to the Release next to the `.exe` — same commit, both
   artifacts, so the Lively pack can't drift out of sync again.
 - ✅ Multi-monitor fixed: one window per display instead of one window spanning the
-  union of all displays (the latter didn't attach reliably — see §8).
+  union of all displays (the latter didn't attach reliably — see §8). **Confirmed fixed
+  by the user on real mixed-DPI hardware (125% primary + differently-scaled secondary)
+  in `Living.Wallpaper.Setup.1.0.3.exe`** — both monitors now show the scene, no sliver
+  of the old wallpaper left on the edge.
 - ✅ Uninstall fixed: NSIS `customInit`/`customUnInit` force-kill the running app so it
   can't survive an uninstall.
 - ✅ Settings toggle switches (info panel / pause-on-fullscreen / start-with-Windows)
@@ -208,6 +211,58 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - ✅ Tray **About…** window (app info + live GitHub developer card).
 - ✅ README has a download badge, build-status badge, and a screenshot gallery
   (`assets/screenshots/`, excluded from the packaged app via `build.files`).
+
+### 6.1 Release history — what shipped and how
+
+The first public push (`v1.0.0`) went out with the extended-monitor bug already in it
+(one window spanning the union of all displays). Everything from `v1.0.1` on is a fix
+found by using the app on real mixed-DPI hardware and reading the actual failure, not a
+guess:
+
+- **`v1.0.1` — extended monitor showed the plain Windows wallpaper.** Root cause: `all`
+  monitor mode created a *single* `BrowserWindow` sized to the bounding box of every
+  display and handed it to `electron-as-wallpaper`'s `attach()`. That reparents a window
+  behind the icons via `SetParent` into `WorkerW`, but a window straddling two monitors
+  with different resolution/DPI doesn't attach reliably — the secondary monitor just kept
+  showing the old wallpaper untouched. Fix: `targetBounds()` now returns one bounds entry
+  **per display**, so `createWallpaperWindows()` (already a loop) creates and attaches a
+  separate window per monitor instead of one big one. This was the structural fix but
+  turned out to be only half of it — see `v1.0.3`.
+- **`v1.0.2` — uninstalling left the wallpaper stuck on screen.** The NSIS uninstaller
+  removed files but never stopped the running process, so the WorkerW-attached window
+  (and 3-4 renderer processes) survived the uninstall. Fix: `nsis/installer.nsh` adds
+  `customInit`/`customUnInit` macros that `taskkill /F /IM "Living Wallpaper.exe" /T`
+  before install, upgrade, *and* uninstall. Also fixed in the same release: the GitHub
+  Release was getting the installer uploaded **twice** under two different names, because
+  electron-builder's own default publish policy (`onTagOrDraft`) was auto-publishing the
+  release itself in addition to the workflow's explicit `softprops/action-gh-release`
+  step — fixed by adding `--publish never` to the `dist` script so only the workflow step
+  publishes.
+- **`v1.0.3` — the per-monitor fix from `v1.0.1` still left a thin sliver of the old
+  wallpaper on one monitor's edge.** This user's setup has different DPI scale factors
+  per monitor (125% primary + a different scale on the secondary). Electron/Chromium can
+  create a `BrowserWindow` with the wrong *initial* DPI context when its `x`/`y` land on
+  a monitor scaled differently than the primary, so it renders undersized on that
+  monitor even though its bounds are numerically correct. `electron-as-wallpaper`'s
+  `attach()` was ruled out first by reading its Rust source (`src/attach.rs`) — it only
+  calls `SetParent`, never touches size or position, so the bug had to be upstream of it.
+  Fix: call `win.setBounds(b)` again right after creating the window (and once more on
+  `did-finish-load`) to force Chromium to redo layout once it knows which monitor it's
+  really on. Also in this release: the three Settings toggle switches (info panel /
+  pause-on-fullscreen / start-with-Windows) were completely unclickable — the checkbox
+  was `display:none` inside a plain `<span class="switch">` instead of a `<label>`, so
+  clicks on the visible track never reached the checkbox. **User-confirmed fixed** on the
+  real extended-monitor setup after installing this build.
+- **`v1.0.4` — no functional fixes, tooling/polish only.** README got a download badge
+  (links to `/releases/latest`), a CI build-status badge, and a 5-image screenshot
+  gallery (captured by driving the scene engine's demo headlessly and compositing the
+  DOM weather-HUD onto the canvas via an SVG `foreignObject`, rather than reusing the
+  user's real desktop screenshots, to keep personal file/folder names out of the public
+  repo). The tray gained an **About…** window with live GitHub developer info.
+- (Landed alongside `v1.0.2`/`v1.0.3`, not its own tag) **CI now builds and attaches
+  `LivingWallpaper-Lively.zip`** on every run — regenerates `lively/index.html` from the
+  current engine, zips it, and attaches it to the tagged Release next to the `.exe` — so
+  the Lively pack can never drift out of sync with the standalone app again.
 
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so
