@@ -10,7 +10,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win",
+    "dist": "electron-builder --win --publish never",
     "pack": "electron-builder --dir"
   },
   "dependencies": {
