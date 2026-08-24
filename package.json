@@ -1,7 +1,7 @@
 {
   "name": "living-wallpaper",
   "productName": "Living Wallpaper",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Live day-cycle & weather desktop wallpaper for Windows",
   "author": { "name": "adnaanaeem", "email": "jbsia.dani@gmail.com" },
   "license": "MIT",
@@ -33,7 +33,8 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "include": "nsis/installer.nsh"
     }
   }
 }
