@@ -134,6 +134,7 @@ function createTray() {
 function rebuildTrayMenu() {
   const menu = Menu.buildFromTemplate([
     { label: 'Settings…', click: openSettings },
+    { label: 'Preview…', click: openPreview },
     { type: 'separator' },
     { label: manualPause ? 'Resume' : 'Pause', click: () => { manualPause = !manualPause; rebuildTrayMenu(); } },
     { label: 'Reload wallpaper', click: () => createWallpaperWindows() },
@@ -165,6 +166,23 @@ function openSettings() {
   settingsWin.setMenu(null);
   settingsWin.loadFile(path.join(__dirname, 'settings.html'));
   settingsWin.on('closed', () => { settingsWin = null; });
+}
+
+// ---- preview window ----
+// Lets a user scrub the full 24h cycle and test weather/temperature without
+// waiting for real time to pass. Self-contained (same file as the dev demo,
+// see tools/build-wallpaper.js) — no IPC bridge needed.
+let previewWin = null;
+function openPreview() {
+  if (previewWin && !previewWin.isDestroyed()) { previewWin.focus(); return; }
+  previewWin = new BrowserWindow({
+    width: 1100, height: 700, minWidth: 640, minHeight: 420,
+    title: 'Living Wallpaper — Preview',
+    webPreferences: { contextIsolation: true }
+  });
+  previewWin.setMenu(null);
+  previewWin.loadFile(path.join(__dirname, 'preview.html'));
+  previewWin.on('closed', () => { previewWin = null; });
 }
 
 // ---- about window ----

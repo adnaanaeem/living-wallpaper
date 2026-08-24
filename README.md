@@ -115,6 +115,8 @@ Output lands in `dist/` (an NSIS installer). For a quick unpacked build use `npm
 ### Tray menu
 - **Settings…** — photo(s), units, location (type a city **or click a map**), monitor,
   panel, autostart
+- **Preview…** — scrub the full 24-hour cycle with a seek bar, test temperature/rain/
+  snow, and switch scenes instantly, without waiting for real time to pass
 - **Pause / Resume** — stop rendering to save power
 - **Reload wallpaper** — re-attach after display changes
 - **Start with Windows** — toggle autostart

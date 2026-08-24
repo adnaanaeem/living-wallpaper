@@ -4,6 +4,7 @@
 //        +  prod-boot.js (real clock, auto weather, units, scene/photo config, pause)
 //        ->  ../src/wallpaper.html   (standalone Electron renderer)
 //        ->  ../lively/index.html    (Lively wallpaper)
+//        ->  ../src/preview.html     (interactive preview window, opened from the tray)
 //
 // Run:  node tools/build-wallpaper.js   (from repo root, or from tools/)
 const fs = require('fs');
@@ -11,8 +12,21 @@ const path = require('path');
 const HERE = __dirname;
 const ROOT = path.join(HERE, '..');
 
-let html = fs.readFileSync(path.join(HERE, 'engine-source.html'), 'utf8');
+const engineSrc = fs.readFileSync(path.join(HERE, 'engine-source.html'), 'utf8');
+let html = engineSrc;
 const prod = fs.readFileSync(path.join(HERE, 'prod-boot.js'), 'utf8');
+
+// 0) Preview window: the engine's own demo panel (seek bar, temp slider, scene
+// picker, rain toggle) is already the interactive preview end users want — ship
+// it as-is, just retitled so it doesn't read like a dev tool.
+const previewHtml = engineSrc.replace(
+  '<title>Living Wallpaper — Day Cycle Demo</title>',
+  '<title>Living Wallpaper — Preview</title>'
+);
+if (previewHtml === engineSrc) throw new Error('preview title replacement failed');
+fs.mkdirSync(path.join(ROOT, 'src'), { recursive: true });
+fs.writeFileSync(path.join(ROOT, 'src', 'preview.html'), previewHtml);
+console.log('Generated preview.html (' + previewHtml.length + ' bytes) -> src/');
 
 // 1) Hide the demo control panel + title (this is a wallpaper).
 html = html.replace('</style>',

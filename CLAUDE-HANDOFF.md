@@ -42,10 +42,14 @@ LivingWallpaper/
 ├─ src/                  ← the STANDALONE Electron app
 │  ├─ main.js            ← main process: wallpaper windows, WorkerW attach, tray,
 │  │                       settings IPC, config, autostart, game-pause polling
-│  ├─ preload.js         ← safe IPC bridge for the settings window
+│  ├─ preload.js         ← safe IPC bridge for the settings + about windows
 │  ├─ config.js          ← JSON config load/save (%APPDATA%) + toRenderer()
 │  ├─ desktop-win.js     ← optional koffi FFI: fullscreen detection (game pause)
 │  ├─ settings.html      ← tray settings UI (scene picker, units, clock, map, monitors…)
+│  ├─ about.html         ← tray About window (app info + live GitHub developer card)
+│  ├─ preview.html       ← GENERATED tray Preview window: 24h seek bar + weather demo
+│  │                       (do not hand-edit; see tools/) — same file as the dev demo,
+│  │                       just retitled
 │  └─ wallpaper.html     ← GENERATED renderer (do not hand-edit; see tools/)
 │
 ├─ lively/               ← the LIVELY pack
@@ -65,9 +69,9 @@ LivingWallpaper/
    └─ package.json       ← tooling deps (@napi-rs/canvas, png-to-ico, gif-encoder-2)
 ```
 
-> **Generated files:** `src/wallpaper.html` and `lively/index.html` are produced by
-> `tools/build-wallpaper.js`. Never edit them directly — edit `tools/engine-source.html`
-> and/or `tools/prod-boot.js`, then re-run the build.
+> **Generated files:** `src/wallpaper.html`, `lively/index.html`, and `src/preview.html`
+> are produced by `tools/build-wallpaper.js`. Never edit them directly — edit
+> `tools/engine-source.html` and/or `tools/prod-boot.js`, then re-run the build.
 
 ---
 
@@ -128,6 +132,12 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
   the weather calls — no IPC proxy needed) and falls back to static text if offline.
   External links go through `lw:open-external`, which only allows `https://github.com/…`
   URLs — the renderer never gets a raw `shell.openExternal`.
+- `preview.html` is the tray **Preview…** window: `tools/engine-source.html`'s own demo
+  panel (seek bar 0–1440 min, temperature slider, scene dropdown, rain toggle, play/
+  real-time/live-weather buttons) was already exactly the "scrub the day and test
+  weather" UI end users want, so `build-wallpaper.js` ships it as-is (just retitled) —
+  no IPC bridge, no preload, self-contained like the dev demo. It's a normal resizable
+  window (not attached behind icons) and doesn't touch `cfg`/the real wallpaper windows.
 
 ### 3.4 Native dependency note (important)
 `electron-as-wallpaper@^2` compiles a **Rust (Neon / N-API)** module at `npm install`.
@@ -209,6 +219,8 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - ✅ Settings toggle switches (info panel / pause-on-fullscreen / start-with-Windows)
   fixed — they were unclickable (see §8).
 - ✅ Tray **About…** window (app info + live GitHub developer card).
+- ✅ Tray **Preview…** window — 24h seek bar, temperature slider, scene picker, rain
+  toggle, so users can check the animation/weather without waiting for real time.
 - ✅ README has a download badge, build-status badge, and a screenshot gallery
   (`assets/screenshots/`, excluded from the packaged app via `build.files`).
 
