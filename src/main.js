@@ -58,9 +58,15 @@ function createWallpaperWindows() {
       webPreferences: { backgroundThrottling: false, contextIsolation: true }
     });
     win.setMenu(null);
+    // Electron/Chromium can create a window on a non-primary monitor with the
+    // wrong initial DPI context when monitors have different scale factors,
+    // leaving it undersized on that display. Re-asserting bounds after
+    // creation forces a correct re-layout for the monitor it's actually on.
+    win.setBounds(b);
     win.loadFile(path.join(__dirname, 'wallpaper.html'));
 
     win.webContents.on('did-finish-load', () => {
+      win.setBounds(b);
       pushConfig(win);
       attachBehindIcons(win);
     });
