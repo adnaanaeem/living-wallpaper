@@ -80,12 +80,15 @@
   .chip .v { font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:2px; }
   .hud.pos-top-right    { top:18px; right:18px; }
   .hud.pos-top-left     { top:18px; left:18px; }
-  .hud.pos-bottom-right { bottom:18px; right:18px; }
-  .hud.pos-bottom-left  { bottom:18px; left:18px; }
+  /* extra bottom clearance: this renders behind the desktop icons, but the
+     taskbar sits on top of everything as its own OS layer, so a naive small
+     offset gets covered by it. 72px comfortably clears a scaled taskbar. */
+  .hud.pos-bottom-right { bottom:72px; right:18px; }
+  .hud.pos-bottom-left  { bottom:72px; left:18px; }
   @media (max-width:520px){
     .hud{ width:calc(100% - 28px); padding:13px 15px; }
     .hud.pos-top-right, .hud.pos-top-left       { top:14px; }
-    .hud.pos-bottom-right, .hud.pos-bottom-left { bottom:14px; }
+    .hud.pos-bottom-right, .hud.pos-bottom-left { bottom:68px; }
     .hud.pos-top-right, .hud.pos-bottom-right   { right:14px; }
     .hud.pos-top-left, .hud.pos-bottom-left     { left:14px; }
     .hud-temp{ font-size:44px; } .title{ display:none; }
