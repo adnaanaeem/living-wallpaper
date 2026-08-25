@@ -12,6 +12,7 @@
     clockStyle: 'digital',               // 'digital' or 'analog'
     scene:   'mountains',                // mountains|city|beach|desert|forest|aurora|village|rotate|random
     showHud: true,
+    hudPosition: 'top-right',            // top-right|top-left|bottom-right|bottom-left
     photo:   null,                       // file:// URL or null
     location:null,                       // {lat,lon,name} or null -> auto (IP)
     theme:   'auto',
@@ -226,6 +227,10 @@
     if(typeof setClockStyle === 'function') setClockStyle(CONFIG.clockStyle);
   }
 
+  function applyHudPosition(){
+    if(typeof setHudPosition === 'function') setHudPosition(CONFIG.hudPosition);
+  }
+
   // ---- scene selection (SCENE is an engine global) ----
   var SCENE_LIST = ['mountains','city','beach','desert','forest','aurora','village'];
   function resolveScene(v){
@@ -246,6 +251,7 @@
     applyScene();
     applyPhoto();
     applyHudVisibility();
+    applyHudPosition();
     applySound();
     applyClockStyle();
     syncUI();       // re-render clock (picks up new format)
@@ -297,6 +303,7 @@
     else if(name==='cityName'){ var s=String(val||'').trim(); if(s) geocodeCity(s); else applyConfig({ location:null }); }
     else if(name==='sound')    applyConfig({ sound: !!val });
     else if(name==='clockStyle'){ var cs=['Digital','Analog']; var ci=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ clockStyle: (cs[ci]||'Digital').toLowerCase() }); }
+    else if(name==='hudPosition'){ var hp=['top-right','top-left','bottom-right','bottom-left']; var hi=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ hudPosition: hp[hi]||'top-right' }); }
   };
   // Lively lifecycle (pause when a fullscreen app is focused)
   window.livelyWallpaperPlaybackChanged = function(e){
@@ -307,6 +314,7 @@
   applyScene();
   applyPhoto();
   applyHudVisibility();
+  applyHudPosition();
   applySound();
   applyClockStyle();
   applyUnits();

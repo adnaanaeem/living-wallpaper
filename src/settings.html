@@ -66,6 +66,7 @@
       <button data-v="random">🎲 Random each launch</button>
     </div>
     <div class="photoName" style="opacity:.45">Scenes show when no photo is set.</div>
+    <div class="photoName" style="opacity:.45">Best results: a wide landscape/scenery shot with open sky at the top, taken in flat/overcast light (not a photo with a strong visible sun or hard shadows already in it — the app adds its own sun glow and can clash with one that's already there). Skip photos with people or pets; the relight is a static colour grade plus rain/snow drawn on top, which looks odd on a face. Avoid pre-filtered photos too, since the day/night grade layers on top of whatever colour balance is already there.</div>
     <div class="row">
       <label>Single photo</label>
       <button class="btn" id="pickPhoto">Choose…</button>
@@ -130,6 +131,15 @@
       <label class="switch"><input type="checkbox" id="showHud"><span class="track"></span></label>
     </div>
     <div class="row">
+      <label>Panel position</label>
+      <div class="seg" id="segHudPos">
+        <button data-v="top-left">↖</button>
+        <button data-v="top-right" class="active">↗</button>
+        <button data-v="bottom-left">↙</button>
+        <button data-v="bottom-right">↘</button>
+      </div>
+    </div>
+    <div class="row">
       <label>Monitor</label>
       <select id="monitor"><option value="all">All monitors</option></select>
     </div>
@@ -174,6 +184,7 @@
     setSeg('segWind', cfg.units.wind);
     setSeg('segClock', cfg.clock || '12');
     setSeg('segClockStyle', cfg.clockStyle || 'digital');
+    setSeg('segHudPos', cfg.hudPosition || 'top-right');
     setScene(cfg.scene || 'mountains');
     $('showHud').checked = !!cfg.showHud;
     $('pauseFs').checked = !!cfg.pauseOnFullscreen;
@@ -207,6 +218,8 @@
     b.onclick = () => save({ clock: b.dataset.v }));
   document.querySelectorAll('#segClockStyle button').forEach(b =>
     b.onclick = () => save({ clockStyle: b.dataset.v }));
+  document.querySelectorAll('#segHudPos button').forEach(b =>
+    b.onclick = () => save({ hudPosition: b.dataset.v }));
 
   $('showHud').onchange = (e) => save({ showHud: e.target.checked });
   $('pauseFs').onchange = (e) => save({ pauseOnFullscreen: e.target.checked });

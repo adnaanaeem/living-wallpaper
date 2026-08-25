@@ -159,6 +159,17 @@ and **Random each launch**. Choose it in **Settings → Background → Illustrat
   times (dawn/noon/dusk/night). They're spaced evenly across 24h and blended as the clock
   moves, so real shadows and light actually change. Set both in **Settings → Background**.
 
+**Choosing a good photo:** the app draws its own sun/moon glow directly onto your photo,
+positioned wherever its day-arc says the sun currently is — so results look best with:
+- A **wide landscape/scenery shot with open sky at the top** (not a close-up or an interior).
+- **Flat, diffuse lighting** — overcast or soft midday light. A photo with a strong visible
+  sun or hard directional shadows already in it will clash with the app's own light.
+- **No people or pets** — it's a static image aged through 24 virtual hours plus rain/snow
+  drawn on top, which reads fine on a landscape and odd on a face.
+- **Unfiltered, neutral white balance** — the day/night color grade layers on top of
+  whatever's already there, so a pre-warmed sunset photo gets double-warmed at golden hour.
+- For the cross-fade set specifically: same framing/tripod position across all the shots.
+
 ## Assets (already generated)
 - `assets/icon.ico`, `assets/icon-256.png`, `assets/tray.png` — app/tray icons.
 - `lively/thumbnail.jpg`, `lively/preview.jpg` — Lively library art.

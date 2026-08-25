@@ -55,7 +55,7 @@
 
   /* Weather HUD overlay (top-right) */
   .hud {
-    position:fixed; top:18px; right:18px; z-index:10;
+    position:fixed; z-index:10;
     width:min(310px, calc(100% - 36px));
     background:rgba(15,20,32,0.42); backdrop-filter:blur(20px) saturate(150%);
     -webkit-backdrop-filter:blur(20px) saturate(150%);
@@ -78,8 +78,16 @@
     border-radius:12px; padding:8px 10px; }
   .chip .k { font-size:10px; text-transform:uppercase; letter-spacing:1px; opacity:0.55; }
   .chip .v { font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:2px; }
+  .hud.pos-top-right    { top:18px; right:18px; }
+  .hud.pos-top-left     { top:18px; left:18px; }
+  .hud.pos-bottom-right { bottom:18px; right:18px; }
+  .hud.pos-bottom-left  { bottom:18px; left:18px; }
   @media (max-width:520px){
-    .hud{ top:14px; right:14px; width:calc(100% - 28px); padding:13px 15px; }
+    .hud{ width:calc(100% - 28px); padding:13px 15px; }
+    .hud.pos-top-right, .hud.pos-top-left       { top:14px; }
+    .hud.pos-bottom-right, .hud.pos-bottom-left { bottom:14px; }
+    .hud.pos-top-right, .hud.pos-bottom-right   { right:14px; }
+    .hud.pos-top-left, .hud.pos-bottom-left     { left:14px; }
     .hud-temp{ font-size:44px; } .title{ display:none; }
   }
   @media (max-width:520px){
@@ -100,7 +108,7 @@
   <p style="margin-top:4px"><a href="https://github.com/adnaanaeem/living-wallpaper" target="_blank" rel="noopener" style="color:#9db4e0;text-decoration:none">★ View on GitHub / Download ↗</a></p>
 </div>
 
-<div class="hud" id="hud">
+<div class="hud pos-top-right" id="hud">
   <div class="hud-loc" id="hudLoc">📍 <span>Location not set</span> <small>· tap 📍 Live weather</small></div>
   <div class="hud-main">
     <div class="hud-temp" id="hudTemp">20°</div>
@@ -1174,6 +1182,12 @@ const hudLoc=document.getElementById('hudLoc'), hudTemp=document.getElementById(
       hudClockAnalog=document.getElementById('hudClockAnalog'),
       hudFeels=document.getElementById('hudFeels'), hudHum=document.getElementById('hudHum'),
       hudWind=document.getElementById('hudWind'), hudPrec=document.getElementById('hudPrec');
+const HUD_POSITIONS=['top-right','top-left','bottom-right','bottom-left'];
+function setHudPosition(pos){
+  const p = HUD_POSITIONS.includes(pos) ? pos : 'top-right';
+  const hudEl = document.getElementById('hud');
+  if(hudEl) hudEl.className = 'hud pos-' + p;
+}
 let CLOCK_STYLE='digital'; // 'digital' | 'analog'
 function setClockStyle(style){ CLOCK_STYLE = (style==='analog') ? 'analog' : 'digital'; updateHUD(); }
 function drawAnalogClock(m){

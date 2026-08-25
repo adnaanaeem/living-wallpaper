@@ -22,6 +22,12 @@
     "items": [ "Digital", "Analog" ],
     "value": 0
   },
+  "hudPosition": {
+    "text": "Weather panel position",
+    "type": "dropdown",
+    "items": [ "Top right", "Top left", "Bottom right", "Bottom left" ],
+    "value": 0
+  },
   "scene": {
     "text": "Illustrated scene",
     "type": "dropdown",

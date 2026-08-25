@@ -7,6 +7,7 @@ const DEFAULTS = {
   units:      { temp: 'C', wind: 'kmh' }, // 'C'|'F', 'kmh'|'mph'
   clock:      '12',        // '12' or '24' hour clock
   clockStyle: 'digital',   // 'digital' or 'analog'
+  hudPosition: 'top-right', // top-right|top-left|bottom-right|bottom-left
   scene:      'mountains', // mountains|city|beach|desert|forest|aurora|village|rotate|random
   showHud:    true,
   photo:      null,        // absolute path to a single image, or null
@@ -45,6 +46,7 @@ function toRenderer(cfg) {
     units:    cfg.units,
     clock:    cfg.clock,
     clockStyle: cfg.clockStyle,
+    hudPosition: cfg.hudPosition,
     scene:    cfg.scene,
     showHud:  cfg.showHud,
     photo:    cfg.photo ? toUrl(cfg.photo) : null,

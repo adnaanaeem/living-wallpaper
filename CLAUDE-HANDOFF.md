@@ -116,6 +116,13 @@ A single `<canvas>` with a `requestAnimationFrame` loop (`draw()`), all pure fun
   canvas, not the main scene canvas, since it only needs to redraw on `updateHUD()`
   ticks, not every animation frame. `setClockStyle()` is the engine-level setter;
   `prod-boot.js`'s `applyClockStyle()` calls it from `CONFIG.clockStyle`.
+- **HUD position:** `setHudPosition()` swaps the `#hud` div's class between
+  `pos-top-right`/`pos-top-left`/`pos-bottom-right`/`pos-bottom-left` (CSS only — each
+  just sets `top`/`bottom`/`left`/`right`). No true drag-to-reposition: the wallpaper
+  window is `focusable:false` with mouse input not forwarded by design (so desktop
+  clicks pass through to the icons underneath), and enabling drag would mean enabling
+  input capture, breaking that. A 4-way preset picker in Settings/Lively sidesteps the
+  conflict entirely.
 - **Swappable landscape:** `drawLandscape()` dispatches on the global `SCENE` to
   `drawSceneMountains / City / Beach / Desert / Forest / Aurora / Village`. Seeded
   geometry is built in `buildScenes()` (called from `resize()`). Forest reuses
@@ -223,6 +230,7 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
   "units":    { "temp": "C|F", "wind": "kmh|mph" },
   "clock":    "12|24",
   "clockStyle": "digital|analog",
+  "hudPosition": "top-right|top-left|bottom-right|bottom-left",
   "scene":    "mountains|city|beach|desert|forest|aurora|village|rotate|random",
   "showHud":  true,
   "photo":    "C:\\path\\img.jpg | null",     // single photo
@@ -265,6 +273,13 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 ---
 
 ## 6. Status — what's DONE
+- ✅ **HUD position picker** — Settings/Lively 4-way preset (top-left/top-right/
+  bottom-left/bottom-right) for the weather panel, CSS-only. No true drag-to-reposition
+  by design — see the gotcha below.
+- ✅ **Photo-selection guidance** — a tip in Settings (above the photo picker) and in
+  the README explaining what makes a source photo work well with Photo mode (open sky,
+  flat lighting, no people, unfiltered) — see §8 for the underlying reason (the app
+  draws its own sun/moon glow directly onto the photo).
 - ✅ **Analog clock option** — Settings/Lively toggle between digital and a small
   hand-drawn analog clock face in the weather panel.
 - ✅ **Distant birds** — a small, deliberately cheap daytime-only flock (3 birds, no
@@ -518,6 +533,17 @@ guess:
   appeared once it swung far enough right). Print `sun.x/W` and `sun.altitude` at
   several `minutes` values (rise, noon, an arbitrary mid-morning point) and check they
   land where they should before trusting a screenshot.
+- **`drawPhotoScene()` paints an actual sun/moon disc + glow directly onto the user's
+  photo** (`ctx.arc(sun.x,sun.y,...)` with `'screen'` blend, not just a color grade) at
+  wherever the day-arc currently has it. This is why photo-selection guidance matters —
+  a photo with its own visible sun or strong directional shadows will visibly clash with
+  the app's light. Worth remembering if the photo-relight passes ever get revisited.
+- **No true drag-to-reposition for the HUD.** The wallpaper `BrowserWindow` is
+  `focusable:false` with `forwardMouseInput:false` (`electron-as-wallpaper`'s `attach()`
+  options) — deliberate, so clicks pass through to the desktop icons underneath instead
+  of being captured by the wallpaper. Live dragging would require enabling mouse input
+  forwarding, which breaks that click-through. A CSS-only 4-corner preset picker
+  (`hudPosition`) sidesteps the conflict.
 
 ## 9. Continuing with Claude
 Point Claude at this file first. Good next asks: "add fog + lightning to storms",
