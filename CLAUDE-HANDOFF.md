@@ -105,7 +105,17 @@ A single `<canvas>` with a `requestAnimationFrame` loop (`draw()`), all pure fun
   volumetric **clouds** whose density follows real `cloud_cover`% (each of the 5 clouds
   has its own reveal `threshold`, so a clear day shows a wisp or two and an overcast one
   shows all five — see `cloudiness` global, set from `liveWeather.cloudCover` in
-  `prod-boot.js`; rain always forces some minimum cloud cover too).
+  `prod-boot.js`; rain always forces some minimum cloud cover too), and **distant birds**
+  (`drawBirds()`) — a fixed pool of 3, daytime-only, hidden in rain, each just two
+  stroked quadratic curves with a `sin()`-driven wing flap and no gradients or per-frame
+  allocation, deliberately cheap next to the existing rain/snow particle systems
+  (hundreds of drops/flakes already run every frame without issue).
+- **Clock style:** `CLOCK_STYLE` ('digital'|'analog', default digital) toggles between
+  the existing `#hudClock` text and `drawAnalogClock()`, which paints a small clock face
+  (ticks, hour/minute hands) onto the `#hudClockAnalog` canvas inside the HUD — a DOM
+  canvas, not the main scene canvas, since it only needs to redraw on `updateHUD()`
+  ticks, not every animation frame. `setClockStyle()` is the engine-level setter;
+  `prod-boot.js`'s `applyClockStyle()` calls it from `CONFIG.clockStyle`.
 - **Swappable landscape:** `drawLandscape()` dispatches on the global `SCENE` to
   `drawSceneMountains / City / Beach / Desert / Forest / Aurora / Village`. Seeded
   geometry is built in `buildScenes()` (called from `resize()`). Forest reuses
@@ -212,6 +222,7 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
 {
   "units":    { "temp": "C|F", "wind": "kmh|mph" },
   "clock":    "12|24",
+  "clockStyle": "digital|analog",
   "scene":    "mountains|city|beach|desert|forest|aurora|village|rotate|random",
   "showHud":  true,
   "photo":    "C:\\path\\img.jpg | null",     // single photo
@@ -254,6 +265,11 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 ---
 
 ## 6. Status — what's DONE
+- ✅ **Analog clock option** — Settings/Lively toggle between digital and a small
+  hand-drawn analog clock face in the weather panel.
+- ✅ **Distant birds** — a small, deliberately cheap daytime-only flock (3 birds, no
+  gradients, no per-frame allocation) drifting across the sky. No perching-on-trees
+  behaviour (out of scope for now — would need per-scene tree-position integration).
 - ✅ **Sun position fixed + real sunrise/sunset by location.** The sun's arc x-formula
   had a real bug (`x = 0.10W − 0.80W·cos(angle)`) that put it off-canvas for the entire
   morning and only 10% across even at solar noon — found from a user report ("sun was

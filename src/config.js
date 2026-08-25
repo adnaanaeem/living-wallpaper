@@ -6,6 +6,7 @@ const { app } = require('electron');
 const DEFAULTS = {
   units:      { temp: 'C', wind: 'kmh' }, // 'C'|'F', 'kmh'|'mph'
   clock:      '12',        // '12' or '24' hour clock
+  clockStyle: 'digital',   // 'digital' or 'analog'
   scene:      'mountains', // mountains|city|beach|desert|forest|aurora|village|rotate|random
   showHud:    true,
   photo:      null,        // absolute path to a single image, or null
@@ -43,6 +44,7 @@ function toRenderer(cfg) {
   return {
     units:    cfg.units,
     clock:    cfg.clock,
+    clockStyle: cfg.clockStyle,
     scene:    cfg.scene,
     showHud:  cfg.showHud,
     photo:    cfg.photo ? toUrl(cfg.photo) : null,

@@ -9,6 +9,7 @@
   var DEFAULTS = {
     units:   { temp:'C', wind:'kmh' },  // 'C'|'F' , 'kmh'|'mph'
     clock:   '12',                       // '12' or '24' hour clock
+    clockStyle: 'digital',               // 'digital' or 'analog'
     scene:   'mountains',                // mountains|city|beach|desert|forest|aurora|village|rotate|random
     showHud: true,
     photo:   null,                       // file:// URL or null
@@ -221,6 +222,10 @@
     if(typeof Sound !== 'undefined') Sound.setEnabled(!!CONFIG.sound);
   }
 
+  function applyClockStyle(){
+    if(typeof setClockStyle === 'function') setClockStyle(CONFIG.clockStyle);
+  }
+
   // ---- scene selection (SCENE is an engine global) ----
   var SCENE_LIST = ['mountains','city','beach','desert','forest','aurora','village'];
   function resolveScene(v){
@@ -242,6 +247,7 @@
     applyPhoto();
     applyHudVisibility();
     applySound();
+    applyClockStyle();
     syncUI();       // re-render clock (picks up new format)
     updateHUD();
     if(locChanged) refreshWeather();
@@ -290,6 +296,7 @@
     else if(name==='photo'){    lastPhotoRel = (val==null ? '' : String(val)).trim() || null; refreshPhoto(); }
     else if(name==='cityName'){ var s=String(val||'').trim(); if(s) geocodeCity(s); else applyConfig({ location:null }); }
     else if(name==='sound')    applyConfig({ sound: !!val });
+    else if(name==='clockStyle'){ var cs=['Digital','Analog']; var ci=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ clockStyle: (cs[ci]||'Digital').toLowerCase() }); }
   };
   // Lively lifecycle (pause when a fullscreen app is focused)
   window.livelyWallpaperPlaybackChanged = function(e){
@@ -301,6 +308,7 @@
   applyPhoto();
   applyHudVisibility();
   applySound();
+  applyClockStyle();
   applyUnits();
   tick();
   refreshWeather();

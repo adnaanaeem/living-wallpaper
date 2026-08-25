@@ -105,6 +105,13 @@
         <button data-v="24">24-hour</button>
       </div>
     </div>
+    <div class="row">
+      <label>Clock style</label>
+      <div class="seg" id="segClockStyle">
+        <button data-v="digital" class="active">Digital</button>
+        <button data-v="analog">Analog</button>
+      </div>
+    </div>
     <div class="row"><label>Location</label></div>
     <div class="loc-row">
       <input type="text" id="cityInput" placeholder="Auto (by IP) — or type a city">
@@ -166,6 +173,7 @@
     setSeg('segTemp', cfg.units.temp);
     setSeg('segWind', cfg.units.wind);
     setSeg('segClock', cfg.clock || '12');
+    setSeg('segClockStyle', cfg.clockStyle || 'digital');
     setScene(cfg.scene || 'mountains');
     $('showHud').checked = !!cfg.showHud;
     $('pauseFs').checked = !!cfg.pauseOnFullscreen;
@@ -197,6 +205,8 @@
     b.onclick = () => save({ units: Object.assign({}, cfg.units, { wind: b.dataset.v }) }));
   document.querySelectorAll('#segClock button').forEach(b =>
     b.onclick = () => save({ clock: b.dataset.v }));
+  document.querySelectorAll('#segClockStyle button').forEach(b =>
+    b.onclick = () => save({ clockStyle: b.dataset.v }));
 
   $('showHud').onchange = (e) => save({ showHud: e.target.checked });
   $('pauseFs').onchange = (e) => save({ pauseOnFullscreen: e.target.checked });

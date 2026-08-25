@@ -16,6 +16,12 @@
     "items": [ "12-hour", "24-hour" ],
     "value": 0
   },
+  "clockStyle": {
+    "text": "Clock style",
+    "type": "dropdown",
+    "items": [ "Digital", "Analog" ],
+    "value": 0
+  },
   "scene": {
     "text": "Illustrated scene",
     "type": "dropdown",

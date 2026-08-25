@@ -69,8 +69,9 @@
   .hud-temp { font-size:52px; font-weight:300; line-height:1; font-variant-numeric:tabular-nums; }
   .hud-ico { font-size:40px; line-height:1; }
   .hud-cond { font-size:13px; opacity:0.85; margin-bottom:12px; }
-  .hud-time { display:flex; align-items:baseline; gap:10px; margin-bottom:12px; }
+  .hud-time { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .hud-clock { font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:0.5px; }
+  .hud-clock-analog { flex:none; filter:drop-shadow(0 1px 4px rgba(0,0,0,0.35)); }
   .hud-date { font-size:12px; opacity:0.65; }
   .hud-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .chip { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.08);
@@ -106,6 +107,7 @@
   </div>
   <div class="hud-cond" id="hudCond">Demo mode — showing slider values</div>
   <div class="hud-time">
+    <canvas class="hud-clock-analog" id="hudClockAnalog" width="56" height="56" style="display:none"></canvas>
     <div class="hud-clock" id="hudClock">06:00</div>
     <div class="hud-date" id="hudDate">—</div>
   </div>
@@ -164,7 +166,7 @@ function resize(){
   canvas.width = Math.round(W*DPR); canvas.height = Math.round(H*DPR);
   ctx.setTransform(DPR,0,0,DPR,0,0);
   HORIZON = H*0.66;
-  buildStars(); buildRanges(); buildTrees(); buildScenes();
+  buildStars(); buildRanges(); buildTrees(); buildBirds(); buildScenes();
 }
 window.addEventListener('resize', resize);
 
@@ -403,6 +405,40 @@ function drawPine(t, col){
     ctx.lineTo(x-tw/2, ty);
     ctx.lineTo(x+tw/2, ty);
     ctx.closePath(); ctx.fill();
+  }
+}
+
+// ---------- distant birds (daytime only) ----------
+// Deliberately cheap: a fixed pool of 3, each drawn as two stroked curves (no
+// gradients, no per-frame allocation) - negligible next to the existing
+// rain/snow particle systems (hundreds of drops/flakes) already in this loop.
+let birds=[];
+function buildBirds(){
+  birds=[];
+  for(let i=0;i<3;i++){
+    birds.push({
+      x: Math.random()*W, y: H*(0.12+Math.random()*0.16),
+      s: 6+Math.random()*4, sp:(0.15+Math.random()*0.12)*(Math.random()<0.5?1:-1),
+      phase: Math.random()*Math.PI*2
+    });
+  }
+}
+function drawBirds(night, rainK){
+  if(night || rainK>0.3 || !birds.length) return;
+  const alpha=clamp(1-rainK*3,0,1)*0.65;
+  ctx.strokeStyle=rgb([30,32,40],alpha);
+  ctx.lineCap='round';
+  for(const b of birds){
+    b.x += b.sp;
+    if(b.x<-30) b.x=W+30; else if(b.x>W+30) b.x=-30;
+    const dir = b.sp<0 ? -1 : 1;
+    const flap = Math.sin(performance.now()*0.006+b.phase)*b.s*0.5;
+    ctx.lineWidth=Math.max(1,b.s*0.14);
+    ctx.beginPath();
+    ctx.moveTo(b.x-b.s*dir, b.y+flap);
+    ctx.quadraticCurveTo(b.x-b.s*0.3*dir, b.y-b.s*0.3, b.x, b.y);
+    ctx.quadraticCurveTo(b.x+b.s*0.3*dir, b.y-b.s*0.3, b.x+b.s*dir, b.y+flap);
+    ctx.stroke();
   }
 }
 
@@ -1026,6 +1062,9 @@ function draw(now){
     drawCloud(c, sky, sun, rainK, clamp(cover,0,0.95)*visibility);
   }
 
+  // --- birds: distant, daytime only ---
+  drawBirds(night, rainK);
+
   // --- rare event: rainbow, briefly after rain tapers off in daylight ---
   const rainTapering = prevRainLevel>rainLevel && rainLevel>0.03 && rainLevel<0.5 && !isSnow;
   if(rainTapering && sun.up && sun.altitude>0.12) rainbowLevel=Math.max(rainbowLevel,1);
@@ -1131,8 +1170,32 @@ tempSlider.addEventListener('input', ()=>{ temperature=+tempSlider.value; syncTe
 const hudLoc=document.getElementById('hudLoc'), hudTemp=document.getElementById('hudTemp'),
       hudIco=document.getElementById('hudIco'), hudCond=document.getElementById('hudCond'),
       hudClock=document.getElementById('hudClock'), hudDate=document.getElementById('hudDate'),
+      hudClockAnalog=document.getElementById('hudClockAnalog'),
       hudFeels=document.getElementById('hudFeels'), hudHum=document.getElementById('hudHum'),
       hudWind=document.getElementById('hudWind'), hudPrec=document.getElementById('hudPrec');
+let CLOCK_STYLE='digital'; // 'digital' | 'analog'
+function setClockStyle(style){ CLOCK_STYLE = (style==='analog') ? 'analog' : 'digital'; updateHUD(); }
+function drawAnalogClock(m){
+  const cv=hudClockAnalog; if(!cv) return;
+  const c2=cv.getContext('2d'), size=cv.width, r=size/2;
+  c2.clearRect(0,0,size,size);
+  const mm=((m%1440)+1440)%1440, hourAngle=((mm/60)%12)/12*Math.PI*2, minAngle=(mm%60)/60*Math.PI*2;
+  c2.beginPath(); c2.arc(r,r,r-2,0,Math.PI*2);
+  c2.fillStyle='rgba(255,255,255,0.08)'; c2.fill();
+  c2.strokeStyle='rgba(255,255,255,0.6)'; c2.lineWidth=1.5; c2.stroke();
+  for(let i=0;i<12;i++){
+    const a=i*Math.PI/6, major=i%3===0, inner=major?r-9:r-6;
+    c2.beginPath();
+    c2.moveTo(r+Math.sin(a)*(r-3), r-Math.cos(a)*(r-3));
+    c2.lineTo(r+Math.sin(a)*inner, r-Math.cos(a)*inner);
+    c2.strokeStyle='rgba(255,255,255,0.55)'; c2.lineWidth=major?1.6:1; c2.stroke();
+  }
+  c2.beginPath(); c2.moveTo(r,r); c2.lineTo(r+Math.sin(hourAngle)*r*0.48, r-Math.cos(hourAngle)*r*0.48);
+  c2.strokeStyle='#fff'; c2.lineWidth=2.6; c2.lineCap='round'; c2.stroke();
+  c2.beginPath(); c2.moveTo(r,r); c2.lineTo(r+Math.sin(minAngle)*r*0.75, r-Math.cos(minAngle)*r*0.75);
+  c2.strokeStyle='#fff'; c2.lineWidth=1.8; c2.lineCap='round'; c2.stroke();
+  c2.beginPath(); c2.arc(r,r,2,0,Math.PI*2); c2.fillStyle='#fff'; c2.fill();
+}
 const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function compass(deg){ if(deg==null)return''; const d=['N','NE','E','SE','S','SW','W','NW']; return d[Math.round(deg/45)%8]; }
@@ -1152,7 +1215,13 @@ function weatherIcon(code, night, temp){
 }
 function updateHUD(){
   const alt=sunInfo(minutes).altitude, night=alt<=0.02;
-  hudClock.textContent=fmt(minutes);
+  if(CLOCK_STYLE==='analog'){
+    hudClock.style.display='none'; hudClockAnalog.style.display='block';
+    drawAnalogClock(minutes);
+  } else {
+    hudClock.style.display=''; hudClockAnalog.style.display='none';
+    hudClock.textContent=fmt(minutes);
+  }
   const [ph]=phaseName(minutes);
   const d=new Date();
   hudDate.textContent=`${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()} · ${ph}`;
