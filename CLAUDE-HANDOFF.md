@@ -83,9 +83,29 @@ LivingWallpaper/
 A single `<canvas>` with a `requestAnimationFrame` loop (`draw()`), all pure functions:
 
 - **Time model:** `minutes` in 0–1440. `skyAt(m)` interpolates keyframed sky palettes
-  (zenith / mid / horizon). `sunInfo(m)` / `moonInfo(m)` give arc position + altitude.
+  (zenith / mid / horizon). `sunInfo(m)` / `moonInfo(m)` give arc position + altitude,
+  using `SUN_RISE`/`SUN_SET` (module-level, minutes-of-day) rather than a fixed
+  schedule — see "Real sunrise/sunset" below.
+- **Real sunrise/sunset:** `calcSunTimes(lat, lon, date)` is a NOAA simplified solar
+  calculator (equation of time + declination, no external calls) returning today's real
+  `{riseMin, setMin}` for a location; `setSunTimes()` writes them into `SUN_RISE`/
+  `SUN_SET`. Both the demo panel's 📍 Live weather button and `prod-boot.js`'s
+  `refreshWeather()` call this once location is known, so the sun's arc and altitude
+  track the user's actual location/date, not a hardcoded 06:00–18:45 day. Moon rise/set
+  isn't independently modeled (real lunar rise/set drifts ~50 min/day and depends on
+  phase, which we don't have inputs for) — it's a stylized simplification: moon rises at
+  sunset, sets at the next sunrise. `remapToReferenceClock(m)` maps a real clock minute
+  onto the fixed reference day (06:00/12:00/18:45) that `KEYS` (sky colour keyframes)
+  and `phaseName()` are authored against, via 5 piecewise-linear anchors (midnight,
+  sunrise, noon, sunset, midnight) — so sky colour and phase labels ("Sunrise", "Dusk"…)
+  stay in sync with the real sun position instead of drifting away from it.
 - **Shared layers (all scenes):** sky gradient, horizon glow tracking the sun/moon,
-  stars + Milky Way at night, sun/moon discs & bloom, soft volumetric clouds.
+  stars + Milky Way at night, sun/moon discs & bloom (plus low-angle **light rays** via
+  `drawSunRays()`, fading in near the horizon and out by ~⅓ up the sky), soft
+  volumetric **clouds** whose density follows real `cloud_cover`% (each of the 5 clouds
+  has its own reveal `threshold`, so a clear day shows a wisp or two and an overcast one
+  shows all five — see `cloudiness` global, set from `liveWeather.cloudCover` in
+  `prod-boot.js`; rain always forces some minimum cloud cover too).
 - **Swappable landscape:** `drawLandscape()` dispatches on the global `SCENE` to
   `drawSceneMountains / City / Beach / Desert / Forest / Aurora / Village`. Seeded
   geometry is built in `buildScenes()` (called from `resize()`). Forest reuses
@@ -234,6 +254,17 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 ---
 
 ## 6. Status — what's DONE
+- ✅ **Sun position fixed + real sunrise/sunset by location.** The sun's arc x-formula
+  had a real bug (`x = 0.10W − 0.80W·cos(angle)`) that put it off-canvas for the entire
+  morning and only 10% across even at solar noon — found from a user report ("sun was
+  overhead around 11:30am, wallpaper showed nothing"). Fixed to a centered, symmetric
+  arc, **and** the fixed 06:00/18:45 schedule is now replaced with real sunrise/sunset
+  computed from the resolved location + today's date (NOAA solar calculator, no
+  external calls). Sky colour and phase labels remap to stay in sync. See §3.1.
+- ✅ **Clouds now follow real weather**, and **low-angle sun rays**. Cloud density scales
+  with live `cloud_cover`% instead of always showing all 5; a clear day shows a wisp,
+  overcast shows all of them. Soft light rays fade in near the horizon at sunrise/sunset
+  and fade out by mid-morning. See §3.1.
 - ✅ Day-cycle engine (sky, sun/moon arc, stars/Milky Way, clouds) with realistic grading.
 - ✅ Live rain + snow (temperature-based), snow cover, frost, heat-haze, cold/warm grade.
 - ✅ Live weather + HUD (IP location, Open-Meteo), 12/24h clock, °C/°F, km/h/mph.
@@ -398,8 +429,6 @@ guess:
   angle, falling leaves (autumn), pollen/dust in heat, lake/ground icing when freezing.
 - ⬜ **Weather-code driven scene mood** — use Open-Meteo `weather_code` (fog/overcast/
   thunder) to modulate clouds/visibility, not just precipitation.
-- ⬜ **Sunrise/sunset accuracy** — compute real sun times from lat/lon/date (currently a
-  fixed 06:00–18:30 arc) so the visual day matches the real sky.
 - ⬜ **Photo cross-fade UI** — reorder/time-tag photos in settings (currently evenly
   spaced by order).
 - ⬜ **Performance** — FPS cap / lower-power mode on battery; pause when display sleeps.
@@ -466,9 +495,20 @@ guess:
   §6.1 for the working recipe). Also call `syncUI()`/`updateHUD()` after changing
   `SCENE`/`minutes`/`liveWeather` — the canvas picks up new values on the next `draw()`,
   but the HUD's DOM text doesn't refresh until those are called explicitly.
+- **Verify arc/position math numerically, not just visually.** The sun x-formula bug
+  (`x = 0.10W − 0.80W·cos(angle)`, off-canvas for the entire morning) had presumably
+  been sitting there since the engine was first written — a purely visual check on the
+  wrong time-of-day could easily miss it (evening/night looked fine; the sun only
+  appeared once it swung far enough right). Print `sun.x/W` and `sun.altitude` at
+  several `minutes` values (rise, noon, an arbitrary mid-morning point) and check they
+  land where they should before trusting a screenshot.
 
 ## 9. Continuing with Claude
 Point Claude at this file first. Good next asks: "add fog + lightning to storms",
-"compute real sunrise/sunset from location", "add a Countryside or Rainforest scene",
-"wire code signing into CI", "start the Android WallpaperService port". Always run
-`node tools/build-wallpaper.js` after engine/prod-boot edits.
+"add a Countryside or Rainforest scene", "wire code signing into CI",
+"start the Android WallpaperService port". Also pending, agreed but not started: a
+texture/shading realism pass on the Mountains scene (noise/grain, directional shading,
+surface detail) as a proof of concept before rolling it out to the other scenes — the
+current look is flat-shaded vector art, which reads as illustrated no matter how good
+the composition is. Always run `node tools/build-wallpaper.js` after engine/prod-boot
+edits.

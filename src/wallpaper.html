@@ -206,6 +206,7 @@ const KEYS = [
   { t:1440, top:[6,10,26],    mid:[12,17,40],   hor:[22,26,52] }
 ];
 function skyAt(m){
+  m = remapToReferenceClock(m);
   let a=KEYS[0], b=KEYS[KEYS.length-1];
   for(let i=0;i<KEYS.length-1;i++){ if(m>=KEYS[i].t && m<=KEYS[i+1].t){ a=KEYS[i]; b=KEYS[i+1]; break; } }
   const span=(b.t-a.t)||1, t=(m-a.t)/span;
@@ -213,22 +214,96 @@ function skyAt(m){
 }
 
 // ---------- celestial ----------
+// Sunrise/sunset (minutes-of-day, local time). Defaults are a placeholder
+// day; setSunTimes() overrides them once a real location is known (see
+// calcSunTimes() below and its callers in the demo panel / prod-boot.js).
+let SUN_RISE=360, SUN_SET=1125;
+function setSunTimes(riseMin, setMin){
+  if(typeof riseMin==='number' && typeof setMin==='number' && setMin>riseMin){
+    SUN_RISE=riseMin; SUN_SET=setMin;
+  }
+}
+// NOAA simplified solar calculator (equation of time + declination) - good
+// to a minute or two, no external calls, no timezone database needed (uses
+// the browser's own local-time/UTC-offset via Date, which already matches
+// the machine's configured timezone).
+function calcSunTimes(lat, lon, date){
+  const d = date || new Date();
+  const start = new Date(d.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((d - start) / 86400000);
+  const gamma = 2*Math.PI/365 * (dayOfYear - 1 + (d.getHours()-12)/24);
+  const eqTime = 229.18*(0.000075 + 0.001868*Math.cos(gamma) - 0.032077*Math.sin(gamma)
+    - 0.014615*Math.cos(2*gamma) - 0.040849*Math.sin(2*gamma));
+  const decl = 0.006918 - 0.399912*Math.cos(gamma) + 0.070257*Math.sin(gamma)
+    - 0.006758*Math.cos(2*gamma) + 0.000907*Math.sin(2*gamma)
+    - 0.002697*Math.cos(3*gamma) + 0.00148*Math.sin(3*gamma);
+  const latRad = lat*Math.PI/180;
+  const zenith = 90.833*Math.PI/180; // includes atmospheric refraction + solar radius
+  const cosH = (Math.cos(zenith) - Math.sin(latRad)*Math.sin(decl)) / (Math.cos(latRad)*Math.cos(decl));
+  if(cosH>1) return null;              // polar night - sun never rises
+  if(cosH<-1) return { riseMin:0, setMin:1439 }; // midnight sun - up all day
+  const haDeg = Math.acos(clamp(cosH,-1,1)) * 180/Math.PI;
+  const offsetMin = -date.getTimezoneOffset(); // local = UTC + offset
+  let riseMin = 720 - 4*(lon + haDeg) - eqTime + offsetMin;
+  let setMin  = 720 - 4*(lon - haDeg) - eqTime + offsetMin;
+  riseMin = ((riseMin % 1440) + 1440) % 1440;
+  setMin  = ((setMin  % 1440) + 1440) % 1440;
+  return { riseMin, setMin };
+}
 function sunInfo(m){
-  const rise=360, set=1125;
+  const rise=SUN_RISE, set=SUN_SET;
   const up=m>=rise&&m<=set;
   const frac=(m-rise)/(set-rise);
   const angle=Math.PI*frac;
-  const x=W*0.10+Math.cos(Math.PI-angle)*W*0.80;
+  const x=W*0.5 - Math.cos(angle)*W*0.44;
   const y=HORIZON+H*0.04 - Math.sin(angle)*H*0.60;
   return { up,x,y,frac,altitude:Math.sin(angle) };
 }
+// Maps a real clock minute onto the "reference day" (rise 06:00, noon 12:00,
+// set 18:45) that KEYS/phaseName are authored against, so sky colour and
+// phase labels stay in sync with the real sunrise/sunset instead of a fixed
+// schedule. Piecewise-linear through 5 anchors: midnight, sunrise, noon,
+// sunset, midnight - monotonic for any realistic (non-polar) rise/set pair.
+function remapToReferenceClock(m){
+  const rise=SUN_RISE, set=SUN_SET;
+  if(m<=rise) return m * (360/Math.max(rise,1));
+  if(m<=720)  return 360 + (m-rise) * (360/Math.max(720-rise,1));
+  if(m<=set)  return 720 + (m-720) * (405/Math.max(set-720,1));
+  return 1125 + (m-set) * (315/Math.max(1440-set,1));
+}
+// Soft crepuscular-style light rays radiating from the sun, for low-angle
+// morning/evening light. Irregular spacing/length via a fixed seeded
+// pattern (not random per-frame, so rays don't flicker between draws).
+function drawSunRays(sun, warm, alpha){
+  const cx=sun.x, cy=sun.y, n=10, maxLen=Math.max(W,H)*1.2;
+  ctx.save();
+  ctx.globalCompositeOperation='screen';
+  for(let i=0;i<n;i++){
+    const baseAngle=(i/n)*Math.PI*2 + Math.sin(i*12.9898)*0.15;
+    const halfWidth=0.05+0.03*Math.sin(i*4.21);
+    const len=maxLen*(0.6+0.4*Math.abs(Math.sin(i*3.7)));
+    const a1=baseAngle-halfWidth, a2=baseAngle+halfWidth;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+Math.cos(a1)*len, cy+Math.sin(a1)*len);
+    ctx.lineTo(cx+Math.cos(a2)*len, cy+Math.sin(a2)*len);
+    ctx.closePath();
+    ctx.fillStyle=rgb(warm, alpha*(0.10+0.08*Math.abs(Math.sin(i*5.5))));
+    ctx.fill();
+  }
+  ctx.restore();
+}
 function moonInfo(m){
-  let mm=m; if(mm<360) mm+=1440;
-  const rise=1125, set=360+1440;
+  // Real lunar rise/set drifts independently of the sun (~50 min/day) and
+  // depends on phase - modeling that accurately needs orbital mechanics we
+  // don't have inputs for. Stylized simplification: moon is up whenever the
+  // sun isn't, rising at sunset and setting at the next sunrise.
+  let mm=m; if(mm<SUN_SET) mm+=1440;
+  const rise=SUN_SET, set=SUN_RISE+1440;
   const up=mm>=rise&&mm<=set;
   const frac=(mm-rise)/(set-rise);
   const angle=Math.PI*frac;
-  const x=W*0.14+Math.cos(Math.PI-angle)*W*0.74;
+  const x=W*0.5 - Math.cos(angle)*W*0.40;
   const y=HORIZON+H*0.02 - Math.sin(angle)*H*0.56;
   return { up,x,y,frac,altitude:Math.sin(angle) };
 }
@@ -334,12 +409,17 @@ function drawPine(t, col){
 }
 
 // ---------- soft volumetric clouds ----------
+// cloudiness: 0 = clear sky, 1 = fully overcast. Each cloud only fades in once
+// cloudiness passes its own threshold, so a clear day shows a wisp or two and
+// an overcast one shows all of them - set from live weather (cloud_cover%)
+// when available, defaults to a demo-friendly partly-cloudy look otherwise.
+let cloudiness = 0.5;
 const clouds=[
-  {x:0.18,y:0.16,s:1.1,sp:0.010,seed:1},
-  {x:0.52,y:0.11,s:0.75,sp:0.014,seed:2},
-  {x:0.82,y:0.20,s:1.35,sp:0.008,seed:3},
-  {x:0.38,y:0.24,s:0.6,sp:0.019,seed:4},
-  {x:0.66,y:0.28,s:0.9,sp:0.012,seed:5}
+  {x:0.18,y:0.16,s:1.1,sp:0.010,seed:1,threshold:0.65},
+  {x:0.52,y:0.11,s:0.75,sp:0.014,seed:2,threshold:0.25},
+  {x:0.82,y:0.20,s:1.35,sp:0.008,seed:3,threshold:0.85},
+  {x:0.38,y:0.24,s:0.6,sp:0.019,seed:4,threshold:0.05},
+  {x:0.66,y:0.28,s:0.9,sp:0.012,seed:5,threshold:0.45}
 ];
 function softPuff(cx,cy,r,litCol,baseCol,lightDir){
   // gradient offset toward light gives shaded 3D feel
@@ -913,6 +993,10 @@ function draw(now){
   if(sun.up && sun.altitude>-0.06){
     const low=1-clamp(sun.altitude,0,1);
     const warm=mix([255,252,236],[255,138,66], low);
+    // morning/evening light rays - strongest right at the horizon, fades out
+    // by the time the sun is a third of the way up, hidden in rain.
+    const rayStrength = clamp((0.40-sun.altitude)/0.40,0,1) * clamp(sun.altitude/0.05,0,1) * (1-rainK);
+    if(rayStrength>0.02) drawSunRays(sun, warm, rayStrength*0.5);
     const glow=ctx.createRadialGradient(sun.x,sun.y,0, sun.x,sun.y, Math.min(W,H)*(0.32+low*0.35));
     glow.addColorStop(0, rgb(warm,0.55*(1-rainK*0.7)));
     glow.addColorStop(0.35, rgb(warm,0.18*(1-rainK*0.7)));
@@ -934,12 +1018,15 @@ function draw(now){
     ctx.beginPath(); ctx.arc(moon.x+mr*0.4,moon.y-mr*0.22,mr*0.92,0,Math.PI*2); ctx.fillStyle=rgb(sky.top,0.6); ctx.fill();
   }
 
-  // --- clouds ---
+  // --- clouds: density follows real cloud cover; rain always brings some ---
+  const effectiveCloudiness = Math.max(cloudiness, rainLevel*0.85);
   const cover = 0.55 + rainK*0.4;
   for(const c of clouds){
     c.x += c.sp*(0.4+rainK)*0.006;
     if(c.x>1.25) c.x=-0.25;
-    drawCloud(c, sky, sun, rainK, clamp(cover,0,0.95));
+    const visibility = clamp((effectiveCloudiness - c.threshold + 0.15)/0.30, 0, 1);
+    if(visibility<=0.01) continue;
+    drawCloud(c, sky, sun, rainK, clamp(cover,0,0.95)*visibility);
   }
 
   // --- rare event: rainbow, briefly after rain tapers off in daylight ---
@@ -1089,6 +1176,7 @@ function updateHUD(){
 }
 
 function phaseName(m){
+  m = remapToReferenceClock(m);
   if(m<300) return ['Deep Night','#3a4a80'];
   if(m<360) return ['Dawn','#8a6aa0'];
   if(m<450) return ['Sunrise','#f6a552'];
@@ -1118,6 +1206,8 @@ locBtn.addEventListener('click', ()=>{
   if(!navigator.geolocation){ setMeta('#ef4444','Geolocation not available here. Use the 🌧 Rain toggle.'); return; }
   navigator.geolocation.getCurrentPosition(async (pos)=>{
     const {latitude,longitude}=pos.coords; setMeta('#facc15','Fetching weather…');
+    const st=calcSunTimes(latitude,longitude,new Date());
+    if(st) setSunTimes(st.riseMin, st.setMin);
     // reverse-geocode the city name (free, no key); don't block weather on it
     let place=`${latitude.toFixed(2)}, ${longitude.toFixed(2)}`;
     try{
@@ -1127,7 +1217,7 @@ locBtn.addEventListener('click', ()=>{
       if(city) place=`${city}${gj.countryCode?', '+gj.countryCode:''}`;
     }catch(e){}
     try{
-      const url=`https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(3)}&longitude=${longitude.toFixed(3)}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m&timezone=auto`;
+      const url=`https://api.open-meteo.com/v1/forecast?latitude=${latitude.toFixed(3)}&longitude=${longitude.toFixed(3)}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,cloud_cover&timezone=auto`;
       const r=await fetch(url); const j=await r.json(); const cur=j.current||{};
       const code=cur.weather_code, precip=cur.precipitation||0, temp=cur.temperature_2m;
       const raining=precip>0||(code>=51&&code<=99);
@@ -1139,6 +1229,7 @@ locBtn.addEventListener('click', ()=>{
         text:`${describe(code)} · ${temp}°C · ${precip}mm`
       };
       if(typeof temp==='number'){ temperature=temp; syncTemp(); }
+      if(typeof cur.cloud_cover==='number'){ cloudiness=clamp(cur.cloud_cover/100,0,1); }
       updateHUD();
       locBtn.classList.add('active');
       const willSnow = raining && temp<=2;
@@ -1262,9 +1353,13 @@ setTimeout(resize,100); setTimeout(resize,500);
     try{
       var loc = await resolveLocation();
       if(!loc) return;
+      if(typeof calcSunTimes === 'function'){
+        var st = calcSunTimes(loc.lat, loc.lon, new Date());
+        if(st) setSunTimes(st.riseMin, st.setMin);
+      }
       var url = 'https://api.open-meteo.com/v1/forecast?latitude='+loc.lat.toFixed(3)
         +'&longitude='+loc.lon.toFixed(3)
-        +'&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m&timezone=auto';
+        +'&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,cloud_cover&timezone=auto';
       var j = await fetch(url).then(function(r){return r.json();});
       var cur = j.current || {};
       var code = cur.weather_code, precip = cur.precipitation||0, temp = cur.temperature_2m;
@@ -1274,9 +1369,11 @@ setTimeout(resize,100); setTimeout(resize,500);
         code: code, place: loc.name, condition: describe(code), precip: precip,
         feels: cur.apparent_temperature, humidity: cur.relative_humidity_2m,
         wind: cur.wind_speed_10m, windDir: cur.wind_direction_10m,
+        cloudCover: cur.cloud_cover,
         text: describe(code)+' · '+temp+'°C · '+precip+'mm'
       };
       if(typeof temp==='number'){ temperature = temp; syncTemp(); }
+      if(typeof cur.cloud_cover==='number'){ cloudiness = clamp(cur.cloud_cover/100, 0, 1); }
       updateHUD();
     }catch(e){}
   }

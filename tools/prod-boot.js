@@ -85,9 +85,13 @@
     try{
       var loc = await resolveLocation();
       if(!loc) return;
+      if(typeof calcSunTimes === 'function'){
+        var st = calcSunTimes(loc.lat, loc.lon, new Date());
+        if(st) setSunTimes(st.riseMin, st.setMin);
+      }
       var url = 'https://api.open-meteo.com/v1/forecast?latitude='+loc.lat.toFixed(3)
         +'&longitude='+loc.lon.toFixed(3)
-        +'&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m&timezone=auto';
+        +'&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,cloud_cover&timezone=auto';
       var j = await fetch(url).then(function(r){return r.json();});
       var cur = j.current || {};
       var code = cur.weather_code, precip = cur.precipitation||0, temp = cur.temperature_2m;
@@ -97,9 +101,11 @@
         code: code, place: loc.name, condition: describe(code), precip: precip,
         feels: cur.apparent_temperature, humidity: cur.relative_humidity_2m,
         wind: cur.wind_speed_10m, windDir: cur.wind_direction_10m,
+        cloudCover: cur.cloud_cover,
         text: describe(code)+' · '+temp+'°C · '+precip+'mm'
       };
       if(typeof temp==='number'){ temperature = temp; syncTemp(); }
+      if(typeof cur.cloud_cover==='number'){ cloudiness = clamp(cur.cloud_cover/100, 0, 1); }
       updateHUD();
     }catch(e){}
   }
