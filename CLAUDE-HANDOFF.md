@@ -2,10 +2,10 @@
 
 A living desktop wallpaper: **one scene that moves through sunrise → noon → sunset →
 night in real time**, with **live rain/snow**, **temperature-driven visuals**, an
-on-screen **weather panel**, **seven illustrated scenes** (Mountains, City, Beach,
-Desert, Forest, Aurora, Snowy Village), rare weather delights (shooting stars,
-post-rain rainbows), optional **ambient audio**, and an option to **relight your own
-photo** through the day.
+on-screen **weather panel**, **eight illustrated scenes** (Mountains, City, Beach,
+Desert, Forest, Aurora, Snowy Village, Waterfall Valley), rare weather delights
+(shooting stars, post-rain rainbows), optional **ambient audio**, and an option to
+**relight your own photo** through the day.
 
 This doc is the single source of truth for picking the project back up — what's built,
 how it fits together, how to run/develop it, and what's planned. Copy this whole folder
@@ -101,7 +101,10 @@ A single `<canvas>` with a `requestAnimationFrame` loop (`draw()`), all pure fun
   onto the fixed reference day (06:00/12:00/18:45) that `KEYS` (sky colour keyframes)
   and `phaseName()` are authored against, via 5 piecewise-linear anchors (midnight,
   sunrise, noon, sunset, midnight) — so sky colour and phase labels ("Sunrise", "Dusk"…)
-  stay in sync with the real sun position instead of drifting away from it.
+  stay in sync with the real sun position instead of drifting away from it. `sunInfo()`'s
+  y-coordinate is anchored to hit exactly `HORIZON` at `m=SUN_RISE`/`SUN_SET` (no offset)
+  so the disc is genuinely bisected by the horizon at the real computed instant — see
+  `v1.0.12` in §6.1 for the bug this replaced and why ridge geometry also needed a fix.
 - **Shared layers (all scenes):** sky gradient, horizon glow tracking the sun/moon,
   stars + Milky Way at night, sun/moon discs & bloom (plus low-angle **light rays** via
   `drawSunRays()`, fading in near the horizon and out by ~⅓ up the sky), soft
@@ -314,6 +317,12 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 ---
 
 ## 6. Status — what's DONE
+- ✅ **Sun/moon now genuinely bisected by the horizon at the exact real sunrise/sunset
+  minute** — two bugs fixed (a ~29px vertical offset in `sunInfo()`/`moonInfo()`, and
+  mountain ridges that happened to peak ~100px above the horizon exactly where the sun's
+  arc rises/sets). Found from a user report with real Lahore sunrise/sunset times;
+  `calcSunTimes()` itself was already accurate. See `v1.0.12` in §6.1 for the full
+  writeup.
 - ✅ **HUD position picker** — Settings/Lively 4-way preset (top-left/top-right/
   bottom-left/bottom-right) for the weather panel, CSS-only. No true drag-to-reposition
   by design — see the gotcha below.
@@ -571,6 +580,44 @@ guess:
     visually on some real setup. If revisiting: the next thing worth trying is whatever
     mechanism actually reads current builds' `Microsoft.LockApp` background (undocumented,
     would need real reverse-engineering / ProcMon tracing — not attempted here).
+- **`v1.0.12` — two real bugs in sun/moon horizon positioning, found from a user report
+  ("sunset in Lahore is 6:34 PM — at that exact time the sun should be exactly half
+  behind the mountains, half above").** Both confirmed and fixed in
+  [tools/engine-source.html](tools/engine-source.html):
+  1. `sunInfo()`/`moonInfo()`'s y-formula had the disc's vertical center offset by
+     `+H*0.04`/`+H*0.02` from `HORIZON` even at the exact rise/set instant (`angle=0`/`π`,
+     `sin(angle)=0`) — so on a 720px-tall canvas the sun's center sat ~29px *below* the
+     horizon at the moment it should have been bisected by it, meaning it would appear to
+     rise late and set early relative to the real computed time. Fixed by removing the
+     offset entirely: `y = HORIZON - sin(angle)*H*0.60` (and the equivalent for the moon)
+     — now `sun.y === HORIZON` exactly at `m=SUN_RISE`/`SUN_SET` (verified to floating-
+     point noise, ~1e-14). Cross-checked `calcSunTimes()` itself against the user's real
+     Lahore figures (5:34 AM/6:34 PM): computed 5:34/18:35 for those coordinates on this
+     machine (whose system timezone is already Asia/Karachi) — the clock-time math was
+     already correct; only the disc's *pixel position at that time* was wrong.
+  2. Even with (1) fixed, the Mountains/Waterfall Valley/Aurora ridges are seeded
+     (`ridge()`) with wavy amplitude up to ~H*0.13–0.17, and the sun's arc always
+     rises/sets at the *same* fixed x (≈0.06W/0.94W — see `sunInfo()`'s
+     `x = 0.5W - cos(angle)*0.44W`). On the existing fixed seeds, the ridge line at
+     those exact x's happened to sit up to ~100px above the horizon (confirmed by
+     sampling ridge points within 8px of the sun's x), which would hide the disc for
+     30–60+ minutes past the real sunrise/sunset before it climbed clear — a separate bug
+     from (1), since the "half above/half below" moment needs the *ground silhouette*,
+     not just the abstract horizon, to be near-flush with the sun's crossing point. Fixed
+     with a new `taperRidgeEdges(pts, radiusFrac)` that pulls ridge points toward
+     `HORIZON` in a falloff zone centered on the sun's two arc-extreme x's (not the
+     screen edges — the sun's arc never actually reaches x=0/x=W, so an earlier attempt
+     anchored to screen-edge distance under-corrected at the real x=0.06W/0.94W points
+     and needed a second pass); applied to `buildRanges()` (Mountains),
+     `buildWaterfallValley()`, and `buildAurora()`. Verified: ridge height at the sun's
+     exact x is now within ~5px of `HORIZON` (down from up to ~100px), and confirmed
+     visually — Beach (flat water horizon, unaffected by this ridge fix) shows the sun
+     precisely bisected by the horizon at the exact computed sunrise minute; Mountains
+     shows the same at sunrise. (At the Mountains-scene sunset moment specifically, the
+     disc is confirmably rendering at the right pixels — verified by sampling the exact
+     RGB right after the fill call, `[255,138,66]` as expected — but is hard to *see* by
+     eye in a screenshot because the dusk sky/vignette happen to land on a very similar
+     warm hue at that exact spot; a color-contrast nuance, not a position bug.)
 
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so

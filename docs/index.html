@@ -269,7 +269,10 @@ function sunInfo(m){
   const frac=(m-rise)/(set-rise);
   const angle=Math.PI*frac;
   const x=W*0.5 - Math.cos(angle)*W*0.44;
-  const y=HORIZON+H*0.04 - Math.sin(angle)*H*0.60;
+  // y must hit exactly HORIZON at angle=0/pi (m=SUN_RISE/SUN_SET) so the sun's
+  // disc is bisected by the horizon at the real computed rise/set instant -
+  // any offset here desyncs the visual sunrise/sunset from the real clock time.
+  const y=HORIZON - Math.sin(angle)*H*0.60;
   return { up,x,y,frac,altitude:Math.sin(angle) };
 }
 // Maps a real clock minute onto the "reference day" (rise 06:00, noon 12:00,
@@ -317,7 +320,7 @@ function moonInfo(m){
   const frac=(mm-rise)/(set-rise);
   const angle=Math.PI*frac;
   const x=W*0.5 - Math.cos(angle)*W*0.40;
-  const y=HORIZON+H*0.02 - Math.sin(angle)*H*0.56;
+  const y=HORIZON - Math.sin(angle)*H*0.56;
   return { up,x,y,frac,altitude:Math.sin(angle) };
 }
 
@@ -359,12 +362,34 @@ function ridge(seed, baseY, amp, rough){
   }
   return pts;
 }
+// The sun/moon rise and set exactly at x=0.06W/0.94W (see sunInfo()'s arc
+// formula: x = 0.5W - cos(angle)*0.44W, extremes at angle=0/pi) and stay near
+// those x's for a while since x barely moves right at the low-altitude ends
+// of the arc. If a ridge's random seed happens to peak tall right there, the
+// disc stays hidden well past the real sunrise/sunset time. Pull ridge height
+// down toward the horizon specifically around those two x's (not just the
+// screen edges, which the sun's arc never actually reaches) so the sun always
+// clears the silhouette close to the actual computed rise/set minute,
+// regardless of how the geometry seed happened to land.
+const SUN_ARC_EDGE_XFRACS=[0.06,0.94];
+function taperRidgeEdges(pts, radiusFrac){
+  for(const p of pts){
+    const xf=p[0]/W;
+    let d=Infinity;
+    for(const ex of SUN_ARC_EDGE_XFRACS) d=Math.min(d, Math.abs(xf-ex));
+    if(d>=radiusFrac) continue;
+    const s=d/radiusFrac, smooth=s*s*(3-2*s);
+    const pull=0.95*(1-smooth);
+    p[1] += (HORIZON-2 - p[1])*pull;
+  }
+}
 function buildRanges(){
   ranges=[
     { pts:ridge(1.3, HORIZON-H*0.10, H*0.10, 0.6), depth:0.82 }, // farthest
     { pts:ridge(4.7, HORIZON-H*0.05, H*0.13, 0.9), depth:0.58 },
     { pts:ridge(8.1, HORIZON-H*0.01, H*0.16, 1.2), depth:0.32 }  // nearest
   ];
+  for(const r of ranges) taperRidgeEdges(r.pts, 0.14);
 }
 function drawRange(r, sky, sunAlt, rainK, snowK){
   // atmospheric perspective: blend silhouette toward horizon-sky color by depth
@@ -792,6 +817,7 @@ function buildAurora(){
     { pts:ridge(6.6, HORIZON-H*0.02, H*0.10, 0.8), depth:0.5 },
     { pts:ridge(10.3, HORIZON+H*0.01, H*0.12, 1.0), depth:0.2 }
   ];
+  for(const r of arcticRanges) taperRidgeEdges(r.pts, 0.14);
 }
 function drawAuroraRibbons(night, rainK){
   const a=clamp((night-0.45)*2,0,1)*(1-rainK);
@@ -836,6 +862,7 @@ function buildWaterfallValley(){
     { pts:ridge(7.4, HORIZON-H*0.08, H*0.15, 0.9), depth:0.50 },
     { pts:ridge(11.6, HORIZON-H*0.01, H*0.17, 1.1), depth:0.22 }
   ];
+  for(const r of wfRanges) taperRidgeEdges(r.pts, 0.14);
 }
 // same silhouette as drawRange, but punches a vertical gap (evenodd hole) so
 // whatever's drawn underneath - the waterfall ribbon - shows through
