@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 const desktop = require('./desktop-win');
+const screensaver = require('./screensaver');
+const lockscreen = require('./lockscreen');
 const pkg = require('../package.json');
 
 // The wallpaper window is focusable:false and never receives real user input, so
@@ -30,14 +32,38 @@ let settingsWin = null;
 let tray = null;
 let manualPause = false;
 let pausePollTimer = null;
+let normalAppInitialized = false;
 
 // Single instance only.
 if (!app.requestSingleInstanceLock()) { app.quit(); }
 
-app.on('second-instance', () => openSettings());
+// Windows invokes a screensaver as `<exe> /s` (run fullscreen), `/p <hwnd>`
+// (embed a small preview - not supported, see screensaver.js), or `/c`
+// (config). Since the wallpaper app is normally already running (and holds
+// the single-instance lock), that invocation almost always arrives here via
+// 'second-instance' rather than a fresh app.whenReady() - so both entry
+// points route through the same dispatcher.
+app.on('second-instance', (_e, argv) => handleLaunch(argv, true));
 
-app.whenReady().then(init);
+app.whenReady().then(() => handleLaunch(process.argv, false));
 app.on('window-all-closed', (e) => { e.preventDefault(); }); // stay alive in tray
+
+function handleLaunch(argv, alreadyRunning) {
+  const mode = screensaver.detectMode(argv).mode;
+  if (mode === 's') {
+    if (!normalAppInitialized) cfg = cfg || config.load();
+    screensaver.runFullscreen(pushConfig, () => { if (!normalAppInitialized) app.exit(0); });
+    return;
+  }
+  if (mode === 'p') {
+    // No embedded native preview - just exit so Windows shows a blank
+    // thumbnail in the classic Screen Saver Settings dialog (see screensaver.js).
+    if (!alreadyRunning) app.exit(0);
+    return;
+  }
+  if (!normalAppInitialized) { init(); normalAppInitialized = true; }
+  if (mode === 'c' || alreadyRunning) openSettings();
+}
 
 function init() {
   cfg = config.load();
@@ -48,6 +74,35 @@ function init() {
   setupAutoUpdater();
   checkForUpdates(false);
   setInterval(() => checkForUpdates(false), 6 * 60 * 60 * 1000); // every 6h
+  applyScreensaverSetting();
+  applyLockScreenSetting();
+}
+
+// ---- screensaver / lock screen ----
+function applyScreensaverSetting() {
+  if (!app.isPackaged) {
+    if (cfg.useAsScreensaver) {
+      cfg.useAsScreensaver = false; config.save(cfg); rebuildTrayMenu();
+      dialog.showMessageBox({ type: 'info', title: 'Screensaver',
+        message: 'Screensaver integration only works in the installed app, not when running from source.' });
+    }
+    return;
+  }
+  if (cfg.useAsScreensaver) screensaver.enable(process.execPath);
+  else screensaver.disable();
+}
+
+function primaryWallpaperWindow() {
+  const pd = screen.getPrimaryDisplay();
+  return wpWindows.find((w) => {
+    try { const b = w.getBounds(); return b.x === pd.bounds.x && b.y === pd.bounds.y; }
+    catch (e) { return false; }
+  }) || wpWindows[0];
+}
+
+function applyLockScreenSetting() {
+  if (cfg.useAsLockScreen) lockscreen.start(primaryWallpaperWindow);
+  else lockscreen.stop();
 }
 
 // ---- choose the surface(s) to cover ----
@@ -258,11 +313,15 @@ function applyAutostart() {
 ipcMain.handle('lw:get-config', () => cfg);
 ipcMain.handle('lw:set-config', (_e, patch) => {
   const monitorChanged = patch && 'monitor' in patch && patch.monitor !== cfg.monitor;
+  const ssChanged = patch && 'useAsScreensaver' in patch && patch.useAsScreensaver !== cfg.useAsScreensaver;
+  const lsChanged = patch && 'useAsLockScreen' in patch && patch.useAsLockScreen !== cfg.useAsLockScreen;
   Object.assign(cfg, patch || {});
   config.save(cfg);
   applyAutostart();
   rebuildTrayMenu();
   if (monitorChanged) createWallpaperWindows(); else pushConfig();
+  if (ssChanged) applyScreensaverSetting();
+  if (lsChanged) applyLockScreenSetting();
   return cfg;
 });
 ipcMain.handle('lw:pick-photo', async () => {

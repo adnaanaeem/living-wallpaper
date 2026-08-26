@@ -32,7 +32,8 @@ const shots=[
   { scene:'mountains', min:1110, name:'scene-mountains.png' }, // sunset
   { scene:'city',      min:1290, name:'scene-city.png' },      // night (lit windows)
   { scene:'beach',     min:600,  name:'scene-beach.png' },     // morning
-  { scene:'desert',    min:1080, name:'scene-desert.png' }     // golden hour
+  { scene:'desert',    min:1080, name:'scene-desert.png' },    // golden hour
+  { scene:'waterfall', min:1110, name:'scene-waterfall.png' }  // sunset
 ];
 for(const s of shots){
   globalThis.__api.setScene(s.scene);

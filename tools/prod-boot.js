@@ -10,7 +10,7 @@
     units:   { temp:'C', wind:'kmh' },  // 'C'|'F' , 'kmh'|'mph'
     clock:   '12',                       // '12' or '24' hour clock
     clockStyle: 'digital',               // 'digital' or 'analog'
-    scene:   'mountains',                // mountains|city|beach|desert|forest|aurora|village|rotate|random
+    scene:   'mountains',                // mountains|city|beach|desert|forest|aurora|village|waterfall|rotate|random
     showHud: true,
     hudPosition: 'top-right',            // top-right|top-left|bottom-right|bottom-left
     photo:   null,                       // file:// URL or null
@@ -232,7 +232,7 @@
   }
 
   // ---- scene selection (SCENE is an engine global) ----
-  var SCENE_LIST = ['mountains','city','beach','desert','forest','aurora','village'];
+  var SCENE_LIST = ['mountains','city','beach','desert','forest','aurora','village','waterfall'];
   function resolveScene(v){
     if(v === 'random') return SCENE_LIST[Math.floor(Math.random()*SCENE_LIST.length)];
     if(v === 'rotate'){
@@ -297,7 +297,7 @@
     if(name==='showHud')       applyConfig({ showHud: !!val });
     else if(name==='units')    applyConfig({ units: (val==='Fahrenheit'||val===1) ? {temp:'F',wind:'mph'} : {temp:'C',wind:'kmh'} });
     else if(name==='clock')    applyConfig({ clock: (val==='24-hour'||val===1) ? '24' : '12' });
-    else if(name==='scene'){   var sc=['mountains','city','beach','desert','forest','aurora','village','rotate','random']; var si=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ scene: sc[si]||'mountains' }); }
+    else if(name==='scene'){   var sc=['mountains','city','beach','desert','forest','aurora','village','waterfall','rotate','random']; var si=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ scene: sc[si]||'mountains' }); }
     else if(name==='usePhoto'){ usePhotoBg = !!val; refreshPhoto(); }
     else if(name==='photo'){    lastPhotoRel = (val==null ? '' : String(val)).trim() || null; refreshPhoto(); }
     else if(name==='cityName'){ var s=String(val||'').trim(); if(s) geocodeCity(s); else applyConfig({ location:null }); }

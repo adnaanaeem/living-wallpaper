@@ -31,7 +31,7 @@
   "scene": {
     "text": "Illustrated scene",
     "type": "dropdown",
-    "items": [ "Mountains & Lake", "City Skyline", "Ocean / Beach", "Desert Dunes", "Forest", "Aurora", "Snowy Village", "Rotate daily", "Random each launch" ],
+    "items": [ "Mountains & Lake", "City Skyline", "Ocean / Beach", "Desert Dunes", "Forest", "Aurora", "Snowy Village", "Waterfall Valley", "Rotate daily", "Random each launch" ],
     "value": 0
   },
   "cityName": {

@@ -60,6 +60,7 @@
       <div class="sceneCard" data-v="forest"><img src="../assets/scenes/forest.jpg" alt=""><span>Forest</span></div>
       <div class="sceneCard" data-v="aurora"><img src="../assets/scenes/aurora.jpg" alt=""><span>Aurora</span></div>
       <div class="sceneCard" data-v="village"><img src="../assets/scenes/village.jpg" alt=""><span>Snowy Village</span></div>
+      <div class="sceneCard" data-v="waterfall"><img src="../assets/scenes/waterfall.jpg" alt=""><span>Waterfall Valley</span></div>
     </div>
     <div class="seg" id="segScene" style="margin-top:8px">
       <button data-v="rotate">🔁 Rotate daily</button>
@@ -157,6 +158,20 @@
     </div>
   </div>
 
+  <div class="card">
+    <h2>Screensaver &amp; Lock Screen</h2>
+    <div class="row">
+      <label>Use as Windows screensaver</label>
+      <label class="switch"><input type="checkbox" id="useScreensaver"><span class="track"></span></label>
+    </div>
+    <div class="photoName" style="opacity:.45">Runs this same scene fullscreen after your PC has been idle, using Windows' own idle timer. Installed app only — not available via <code>npm start</code>. Won't show up in the classic Screen Saver Settings dropdown (that list only shows .scr files), but Windows will launch it on idle all the same.</div>
+    <div class="row">
+      <label>Use as lock screen (updates periodically)</label>
+      <label class="switch"><input type="checkbox" id="useLockScreen"><span class="track"></span></label>
+    </div>
+    <div class="photoName" style="opacity:.45">Sets a snapshot of the current scene as your Windows lock screen picture, refreshed every 30 minutes. The lock screen itself can't animate live — Windows renders it on a separate secure desktop no app can draw into — so this is a still image, not the live wallpaper. Note: on some Windows 11 builds this call succeeds but the lock screen doesn't actually update — a Windows-side limitation, not something wrong with your setup.</div>
+  </div>
+
   <div class="foot">
     <button class="btn ghost" id="closeBtn">Close</button>
   </div>
@@ -190,6 +205,8 @@
     $('pauseFs').checked = !!cfg.pauseOnFullscreen;
     $('autostart').checked = !!cfg.autostart;
     $('sound').checked = !!cfg.sound;
+    $('useScreensaver').checked = !!cfg.useAsScreensaver;
+    $('useLockScreen').checked = !!cfg.useAsLockScreen;
     $('photoName').textContent = (cfg.photos && cfg.photos.length)
       ? (cfg.photos.length + ' photos — day cross-fade')
       : (cfg.photo ? cfg.photo : 'Illustrated scene (no photo)');
@@ -225,6 +242,8 @@
   $('pauseFs').onchange = (e) => save({ pauseOnFullscreen: e.target.checked });
   $('autostart').onchange = (e) => save({ autostart: e.target.checked });
   $('sound').onchange = (e) => save({ sound: e.target.checked });
+  $('useScreensaver').onchange = (e) => save({ useAsScreensaver: e.target.checked });
+  $('useLockScreen').onchange = (e) => save({ useAsLockScreen: e.target.checked });
   $('monitor').onchange = (e) => save({ monitor: e.target.value });
   document.querySelectorAll('#sceneGrid .sceneCard').forEach(c =>
     c.onclick = () => save({ scene: c.dataset.v }));

@@ -47,6 +47,9 @@ LivingWallpaper/
 │  ├─ preload.js         ← safe IPC bridge for the settings + about windows
 │  ├─ config.js          ← JSON config load/save (%APPDATA%) + toRenderer()
 │  ├─ desktop-win.js     ← optional koffi FFI: fullscreen detection (game pause)
+│  ├─ screensaver.js     ← `/s`/`/p`/`/c` argv handling + registry enable/disable (§3.3)
+│  ├─ screensaver-preload.js ← forwards input events so `/s` mode exits on activity
+│  ├─ lockscreen.js      ← periodic snapshot → WinRT LockScreen API (best-effort, §3.3/§8)
 │  ├─ settings.html      ← tray settings UI (scene picker, units, clock, map, monitors…)
 │  ├─ about.html         ← tray About window (app info + live GitHub developer card)
 │  ├─ preview.html       ← GENERATED tray Preview window: 24h seek bar + weather demo
@@ -214,6 +217,42 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
   `main` / `/docs` — no Actions workflow needed; Pages redeploys on its own whenever
   `docs/` changes on `main`) at `https://adnaanaeem.github.io/living-wallpaper/`.
   `docs/.nojekyll` skips GitHub's default Jekyll processing.
+- **`screensaver.js` — Windows screensaver, same exe.** A Windows screensaver is just an
+  executable invoked with a conventional command line (`/s` = run fullscreen, `/p <hwnd>`
+  = embed a small preview, `/c` = config), so rather than shipping a second binary,
+  `main.js`'s `handleLaunch()` inspects `process.argv` (and the forwarded argv from
+  `second-instance`, since the wallpaper app is normally already running and holds the
+  single-instance lock) and branches: `/s` creates one fullscreen, focusable, always-
+  on-top `BrowserWindow` per display showing `wallpaper.html` (via `screensaver.js`'s
+  `runFullscreen()`), exits on any keyboard input (`before-input-event`) or real mouse
+  movement/click/wheel (injected listener + `screensaver-preload.js`'s
+  `lwScreensaver.exit()`, with an 8px movement threshold so jitter doesn't dismiss it
+  instantly). `/p` just exits immediately — see the gotcha below, no embedded native
+  preview. Settings' **"Use as Windows screensaver"** toggle calls `screensaver.enable()`
+  /`disable()`, which point Windows' own idle-timer at this exe via `HKCU\Control
+  Panel\Desktop`'s `SCRNSAVE.EXE`/`ScreenSaveActive` registry values (the same values the
+  classic dialog itself writes) — `ScreenSaveTimeOut` is only set if the user doesn't
+  already have one, so an existing idle-timeout preference isn't silently overridden.
+  Packaged app only (`app.isPackaged`), same guard pattern as auto-update.
+- **`lockscreen.js` — periodic lock-screen snapshot (currently non-functional on modern
+  Windows 11, see §6/§8 — kept as best-effort, do not advertise as working).** The
+  Windows lock screen renders on a separate secure desktop that no regular process can
+  draw into, so there's no way to make it animate live. When Settings' **"Use as lock
+  screen"** toggle is on, every 30 minutes `lockscreen.js` grabs
+  `webContents.capturePage()` from the primary wallpaper window, saves it to
+  `%APPDATA%/Living Wallpaper/lockscreen.png`, and calls the WinRT
+  `Windows.System.UserProfile.LockScreen.SetImageFileAsync` API — reached from Node
+  without any native module by shelling out to `powershell.exe` with
+  `ContentType=WindowsRuntime` type activation (the same technique apps like Bing
+  Wallpaper have historically used). The call itself succeeds and updates its own
+  metadata (`LockScreen.OriginalImageFile`), but was confirmed live on a real Windows 11
+  build (10.0.26200) to **not** change what's actually rendered on the lock screen —
+  see §6's writeup for what was ruled out (Spotlight, slideshow, group policy) and the
+  likely cause (the modern lock screen renderer is a separate system app that appears
+  not to source its background from this call anymore). See the §8 gotcha for why the
+  PowerShell side needs a reflection-based `AsTask` awaiter rather than the naively-
+  expected `.Status`/`.GetResults()` — that part *is* solid; the non-functional part is
+  specifically the OS actually honoring the change.
 
 ### 3.4 Native dependency note (important)
 `electron-as-wallpaper@^2` compiles a **Rust (Neon / N-API)** module at `npm install`.
@@ -239,7 +278,9 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
   "monitor":  "all | <displayId>",
   "autostart": false,
   "pauseOnFullscreen": true,
-  "sound":    false          // ambient rain/wind/cricket audio, off by default
+  "sound":    false,         // ambient rain/wind/cricket audio, off by default
+  "useAsScreensaver": false, // registers this exe as the Windows screensaver (packaged app only)
+  "useAsLockScreen":  false  // confirmed non-functional on modern Windows 11 - see §6/§8; kept as best-effort
 }
 ```
 Weather: **Open-Meteo** (no key). Reverse geocode: **BigDataCloud**. IP locate:
@@ -299,8 +340,22 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 - ✅ Day-cycle engine (sky, sun/moon arc, stars/Milky Way, clouds) with realistic grading.
 - ✅ Live rain + snow (temperature-based), snow cover, frost, heat-haze, cold/warm grade.
 - ✅ Live weather + HUD (IP location, Open-Meteo), 12/24h clock, °C/°F, km/h/mph.
-- ✅ Seven scenes (Mountains, City, Beach, Desert, Forest, Aurora, Snowy Village) +
-  Rotate/Random; thumbnail picker in settings; scene dropdown in Lively.
+- ✅ Eight scenes (Mountains, City, Beach, Desert, Forest, Aurora, Snowy Village,
+  Waterfall Valley) + Rotate/Random; thumbnail picker in settings; scene dropdown in
+  Lively. **Waterfall Valley** adds a waterfall ribbon cut through two mountain layers,
+  drifting lake mist, and a foreground fence, reusing the existing ridge/water/pine/bird
+  primitives — see §6.1's `v1.0.11` entry for the canvas hole-punching gotcha it
+  surfaced.
+- ✅ **Windows screensaver mode** — the packaged `.exe` responds to `/s` (run
+  fullscreen), `/p` (preview), `/c` (configure → opens Settings) so it can be registered
+  as a normal Windows screensaver; toggle in Settings. Registry writes verified live;
+  the fullscreen window itself needs a real packaged-build test pass (see §6.1).
+- 🟡 **Lock-screen snapshot (best-effort, confirmed non-functional on tested Windows
+  11 build)** — periodically sets a scene snapshot as the Windows lock screen picture
+  via the WinRT `LockScreen` API. The call succeeds but doesn't change what's actually
+  rendered on this machine's Windows 11 build — kept as a harmless opt-in toggle rather
+  than removed, since it costs nothing when off. Do not tell users this works. See
+  §6.1's `v1.0.11` entry and §8's gotcha for the full investigation.
 - ✅ Rare weather delights — shooting stars on clear nights, a rainbow that fades in
   after rain tapers off in daylight and fades back out over a minute or two.
 - ✅ Optional ambient audio — procedural rain/wind/cricket sound (no asset files), off
@@ -448,6 +503,74 @@ guess:
   visual. Also added dedicated `assets/screenshots/` shots for Forest/Aurora/Village,
   extending the gallery to all seven scenes; the now-unused `hero-mountains-hud.jpg` was
   deleted.
+- **`v1.0.7` — sun position bug fix + real sunrise/sunset by location.** See §6's
+  "Sun position fixed" bullet above for the root cause and fix; §3.1 for
+  `calcSunTimes()`/`remapToReferenceClock()`. Also landed in this release: clouds
+  driven by live `cloud_cover`%, and low-angle sun rays at sunrise/sunset.
+- **`v1.0.8` — analog clock option + distant birds.** `CLOCK_STYLE` toggle
+  (`drawAnalogClock()`) and a small cheap daytime-only bird flock (`drawBirds()`). See
+  §6/§3.1 above for detail.
+- **`v1.0.9` — HUD position picker + photo-selection guidance.** CSS-only 4-way preset
+  for the weather panel (no true drag, see §8's gotcha on why), plus a Settings/README
+  tip on what makes a source photo work well with Photo mode.
+- **`v1.0.10` — fix: HUD hiding behind the taskbar in bottom positions.** Found by
+  actually using bottom-right/bottom-left HUD placement on a real desktop: both only
+  had 18px of clearance from the screen edge, the same as the top positions, nowhere
+  near enough to clear a taskbar — which sits on top of everything as its own OS layer
+  above the wallpaper, not something the wallpaper window can measure or avoid other
+  than by guessing generously. Bumped bottom clearance to 72px (68px at the mobile
+  breakpoint).
+- **`v1.0.11` — new "Waterfall Valley" scene, plus a Windows screensaver mode and a
+  best-effort (confirmed non-functional) lock-screen snapshot feature.**
+  **Waterfall Valley** ([tools/engine-source.html](tools/engine-source.html)) reuses the
+  existing ridge/water/pine/bird primitives and adds three new pieces: a waterfall
+  ribbon threaded between two mountain layers, drifting mist bands over the lake, and a
+  foreground fence. Building it surfaced a real canvas gotcha worth remembering: cutting
+  a "hole" in a filled shape with `ctx.fill('evenodd')` only works if the hole subpath
+  stays *inside* the outer shape — any part of the hole that falls outside gets filled
+  solid instead of doing nothing, so the hole's bounds must be clamped to the actual
+  ridge geometry at that column, not a fixed offset (see §8's gotcha entry). Verified by
+  sampling actual rendered pixel colors (not just eyeballing the screenshot) at sunset,
+  noon, and night+snow+rain — the visual bug wasn't obvious until specific pixel values
+  were checked. **Windows screensaver + periodic lock-screen snapshot.** `screensaver.js`/
+  `lockscreen.js` + a Settings card, wired per §3.3.
+  - ✅ Verified: the `/s`/`/p`/`/c` argv-detection regexes (`screensaver.js`'s
+    `detectMode()`), against real Windows invocation patterns.
+  - ✅ Verified: the `HKCU\Control Panel\Desktop` registry writes (`screensaver.enable()`
+    /`disable()`) — ran the exact commands live (pointed `SCRNSAVE.EXE` at a harmless
+    placeholder, confirmed the write, restored the user's original values exactly).
+  - ⬜ **Not** live-verified: the actual fullscreen `/s` window itself — this dev sandbox
+    couldn't produce a working local Electron build (no Rust toolchain for
+    `electron-as-wallpaper`, and writing new `.exe` files appears to be sandbox-blocked
+    entirely, so `electron.exe` itself never fully extracted). The window/input-exit code
+    is straightforward Electron (`BrowserWindow` + `before-input-event` + a content-side
+    listener), but treat it as needing a real test pass in a packaged build.
+  - ❌ **`useAsLockScreen` does not work on current Windows 11 (confirmed on build
+    10.0.26200) and should be treated as non-functional, not just unverified.** The WinRT
+    plumbing itself is solid — `System.__ComObject`'s lack of a usable
+    `.Status`/`.GetResults()` on a raw `IAsyncOperation<T>` was hit live, fixed with a
+    reflection-based `AsTask` awaiter (see `lockscreen.js`, and the §8 gotcha), and
+    `LockScreen.SetImageFileAsync` was run for real against this machine's actual lock
+    screen: it returned success, and `[Windows.System.UserProfile.LockScreen]::
+    OriginalImageFile` afterward correctly reported the path we set. **But the visible
+    lock screen never changed**, confirmed across two separate lock/unlock cycles.
+    Checked and ruled out: Windows Spotlight (`RotatingLockScreenEnabled=0`),
+    slideshow mode (`SlideshowEnabled=0` under `HKCU\...\CurrentVersion\Lock Screen`),
+    and group policy (`HKLM\SOFTWARE\Policies\Microsoft\Windows\Personalization` doesn't
+    exist on this machine). The registry blob under `HKCU\...\CurrentVersion\Lock
+    Screen` *did* record our write (`Details_B: IMAGENAME:...powershell.exe`), so the
+    call reaches the OS layer — it just isn't reflected by the actual renderer, which on
+    modern builds is a separate system app (`LockAppAumId:
+    Microsoft.LockApp_cw5n1h2txyewy!WindowsDefaultLockScreen`). Likely explanation:
+    Microsoft has quietly stopped having that renderer source its background from this
+    classic WinRT call on recent Windows 11 builds, even though the call itself still
+    "succeeds." Decision: keep the code and the Settings toggle rather than rip it out —
+    it's a harmless no-op where it doesn't work, costs nothing when off, and might work
+    on other Windows versions/configurations or if Microsoft's behavior differs
+    elsewhere — but do **not** advertise this as a working feature until it's confirmed
+    visually on some real setup. If revisiting: the next thing worth trying is whatever
+    mechanism actually reads current builds' `Microsoft.LockApp` background (undocumented,
+    would need real reverse-engineering / ProcMon tracing — not attempted here).
 
 ## 7. Roadmap — what's PLANNED / next
 - ⬜ **Code signing** — sign the `.exe` (needs a paid cert); wire cert as a CI secret so
@@ -538,12 +661,56 @@ guess:
   wherever the day-arc currently has it. This is why photo-selection guidance matters —
   a photo with its own visible sun or strong directional shadows will visibly clash with
   the app's light. Worth remembering if the photo-relight passes ever get revisited.
+- **No embedded native `/p` screensaver preview, on purpose.** Windows' classic Screen
+  Saver Settings dialog wants a live thumbnail rendered inside a small HWND it owns,
+  which means reparenting our window into it (`SetParent` + clearing `WS_POPUP`/setting
+  `WS_CHILD` via `SetWindowLongPtrW` + `MoveWindow`). Tried via `koffi` and it segfaulted
+  in isolated testing (two real Notepad windows, no Electron involved) — a `koffi`-
+  registered `EnumWindows` callback crashed on cleanup. Not worth chasing for a thumbnail
+  in a dialog most users never open: `/p` just exits immediately, Windows shows a blank
+  preview box, and the real screensaver (`/s`, fullscreen) is completely unaffected.
+- **WinRT async calls from PowerShell need a reflection-based `AsTask` awaiter, not
+  `.Status`/`.GetResults()`.** Activating a WinRT class from PowerShell via
+  `[Type,Namespace,ContentType=WindowsRuntime]` works fine for plain calls, but a method
+  returning `IAsyncOperation<T>` (e.g. `StorageFile.GetFileFromPathAsync`) comes back as
+  a bare `System.__ComObject` — polling `.Status` prints nothing and `.GetResults()`
+  isn't reachable, because `AsTask` (from `System.Runtime.WindowsRuntime`, which needs
+  an explicit `Add-Type -AssemblyName System.Runtime.WindowsRuntime`) is a *generic*
+  method, so PowerShell's late binding can't resolve which overload to use without
+  reflection (`MakeGenericMethod`). `IAsyncAction` (e.g.
+  `LockScreen.SetImageFileAsync`) needs the same treatment minus the generic dispatch.
+  See `lockscreen.js`'s `Await`/`AwaitAction` PowerShell functions. Also: pass a script
+  this size as an actual `.ps1` file (`-File`), not `-Command`/`-EncodedCommand` with a
+  multi-line string — the latter mangled a `$path` variable assignment in testing for no
+  obvious reason once the script grew past a couple of lines.
 - **No true drag-to-reposition for the HUD.** The wallpaper `BrowserWindow` is
   `focusable:false` with `forwardMouseInput:false` (`electron-as-wallpaper`'s `attach()`
   options) — deliberate, so clicks pass through to the desktop icons underneath instead
   of being captured by the wallpaper. Live dragging would require enabling mouse input
   forwarding, which breaks that click-through. A CSS-only 4-corner preset picker
   (`hudPosition`) sidesteps the conflict.
+- **`ctx.fill('evenodd')` only punches a real hole where the hole subpath stays inside
+  the outer shape.** Any part of a hole subpath that falls *outside* the outer shape
+  doesn't get subtracted from anything — under even/odd parity it's just its own
+  region with a count of 1 (odd), so it gets filled solid with whatever `fillStyle` is
+  set. Used to cut the waterfall gap into `drawSceneWaterfall()`'s mountain ridges
+  (`drawRangeWithGap()`): the first attempt anchored the hole's top edge to a fixed
+  offset from `HORIZON`, which sat above the actual (wavy, seeded) ridge line at that
+  column — so instead of a see-through gap, that stretch rendered as a solid mountain-
+  colored block, hiding the waterfall ribbon drawn underneath it. Fixed by scanning the
+  ridge's own points near the gap column for their minimum y and clamping the hole's top
+  to that, so the hole subpath never extends past the shape it's cut from. Caught by
+  sampling actual rendered pixel colors at specific coordinates, not by eyeballing the
+  screenshot — the wrong-looking block was subtle enough to miss visually at thumbnail
+  size.
+- **`LockScreen.SetImageFileAsync` reports success without actually changing the visible
+  lock screen, on at least one real Windows 11 build (10.0.26200).** See §6.1's
+  `v1.0.11` entry for the full investigation (Spotlight/slideshow/policy all ruled out;
+  the modern lock screen is rendered by a separate system app,
+  `Microsoft.LockApp_cw5n1h2txyewy!WindowsDefaultLockScreen`, that appears not to source
+  its background from this classic WinRT call anymore). Don't trust this API's return
+  value as proof the lock screen actually changed — verify visually (lock the session)
+  before ever calling this "done."
 
 ## 9. Continuing with Claude
 Point Claude at this file first. Good next asks: "add fog + lightning to storms",

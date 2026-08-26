@@ -16,7 +16,7 @@ const api='\n;globalThis.__api={setScene:function(s){SCENE=s;},setMin:function(m
 eval(engine+api);
 const dir=require('path').join(__dirname,'..','assets','scenes'); fs.mkdirSync(dir,{recursive:true});
 const shots=[
- {s:'mountains',m:1110},{s:'city',m:1290},{s:'beach',m:600},{s:'desert',m:1080}
+ {s:'mountains',m:1110},{s:'city',m:1290},{s:'beach',m:600},{s:'desert',m:1080},{s:'waterfall',m:1110}
 ];
 for(const o of shots){ globalThis.__api.setScene(o.s); globalThis.__api.setMin(o.m); globalThis.__api.setTemp(22); globalThis.__api.setRain(false); globalThis.__api.frame(); globalThis.__api.frame();
  fs.writeFileSync(dir+'/'+o.s+'.jpg', real.toBuffer('image/jpeg',86)); console.log('thumb',o.s); }

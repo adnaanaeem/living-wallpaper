@@ -162,6 +162,7 @@
       <option value="forest">🌲 Forest</option>
       <option value="aurora">🌌 Aurora</option>
       <option value="village">🏘 Snowy Village</option>
+      <option value="waterfall">🏞 Waterfall Valley</option>
     </select>
     <div class="meta" id="meta"><span class="dot" style="background:#888"></span>Drag the bar to scrub the day · pick a scene · drop a photo anywhere.</div>
   </div>
@@ -826,6 +827,125 @@ function drawSceneAurora(sky,sun,moon,night,rainK,snowCover,heat){
   ctx.fillStyle=g; ctx.fillRect(0,shoreY,W,H-shoreY);
 }
 
+// ---- Waterfall Valley ----
+let wfRanges=[], wfNotchX=0;
+function buildWaterfallValley(){
+  wfNotchX = W*(0.46+Math.random()*0.08);
+  wfRanges=[
+    { pts:ridge(3.3, HORIZON-H*0.16, H*0.13, 0.7), depth:0.80 },
+    { pts:ridge(7.4, HORIZON-H*0.08, H*0.15, 0.9), depth:0.50 },
+    { pts:ridge(11.6, HORIZON-H*0.01, H*0.17, 1.1), depth:0.22 }
+  ];
+}
+// same silhouette as drawRange, but punches a vertical gap (evenodd hole) so
+// whatever's drawn underneath - the waterfall ribbon - shows through
+function drawRangeWithGap(r, sky, sunAlt, rainK, snowK, gapX, gapHalfW){
+  const base=stormy([18,24,44], rainK*0.4);
+  let col=mix(base, sky.hor, r.depth*0.55);
+  col=mix(col, sky.mid, r.depth*0.25);
+  const snowTint=mix([236,242,250], sky.hor, 0.15);
+  col=mix(col, snowTint, snowK*(0.35+(1-r.depth)*0.45));
+  ctx.beginPath();
+  ctx.moveTo(0,H);
+  ctx.lineTo(r.pts[0][0], r.pts[0][1]);
+  for(const p of r.pts) ctx.lineTo(p[0],p[1]);
+  ctx.lineTo(W,H); ctx.closePath();
+  // the hole must stay inside the silhouette it's cut from - anywhere a hole
+  // subpath falls outside the outer shape gets filled solid under evenodd
+  // instead of doing nothing, so anchor its top to the ridge's own height
+  // in that column rather than a fixed y.
+  let gapTop=H;
+  for(const p of r.pts){ if(Math.abs(p[0]-gapX)<=gapHalfW+2 && p[1]<gapTop) gapTop=p[1]; }
+  ctx.moveTo(gapX-gapHalfW, H);
+  ctx.lineTo(gapX-gapHalfW, gapTop);
+  ctx.lineTo(gapX+gapHalfW, gapTop);
+  ctx.lineTo(gapX+gapHalfW, H);
+  ctx.closePath();
+  ctx.fillStyle=rgb(col);
+  ctx.fill('evenodd');
+  if(snowK>0.05){
+    ctx.fillStyle=rgb([248,251,255], snowK*0.8*(1-r.depth*0.5));
+    for(let i=1;i<r.pts.length-1;i++){
+      const p=r.pts[i];
+      if(p[1]<=r.pts[i-1][1] && p[1]<=r.pts[i+1][1] && Math.abs(p[0]-gapX)>gapHalfW){
+        ctx.beginPath(); ctx.ellipse(p[0], p[1]+H*0.012, W*0.02, H*0.016, 0, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+}
+function drawWaterfallRibbon(cx, topY, botY, sky, night, rainK){
+  const segs=14, wTop=W*0.014, wBot=W*0.03;
+  const t=performance.now()*0.0009;
+  const left=[], right=[];
+  for(let i=0;i<=segs;i++){
+    const f=i/segs, y=topY+(botY-topY)*f;
+    const wob=Math.sin(f*6.2+t*0.6)*W*0.004*(0.3+f*0.7);
+    const w=(wTop+(wBot-wTop)*f)/2;
+    left.push([cx+wob-w,y]); right.push([cx+wob+w,y]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(left[0][0],left[0][1]);
+  for(const p of left) ctx.lineTo(p[0],p[1]);
+  for(let i=right.length-1;i>=0;i--) ctx.lineTo(right[i][0],right[i][1]);
+  ctx.closePath();
+  const dayBase=mix([255,255,255], sky.hor, 0.12), nightBase=mix([150,170,210], sky.hor,0.3);
+  const base = mix(dayBase, nightBase, night);
+  const g=ctx.createLinearGradient(0,topY,0,botY);
+  g.addColorStop(0, rgb(stormy(mix(base,[255,255,255],0.3), rainK*0.3)));
+  g.addColorStop(1, rgb(stormy(mix(base,[200,215,235],0.35), rainK*0.3)));
+  ctx.fillStyle=g; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle=rgb([255,255,255],0.35);
+  for(let i=0;i<5;i++){
+    const f=((t*1.4+i/5)%1);
+    const y=topY+(botY-topY)*f;
+    ctx.fillRect(cx-wBot, y, wBot*2, 2.5);
+  }
+  ctx.restore();
+}
+function drawMistBands(sky, rainK){
+  const t=performance.now()*0.00012;
+  const bands=[
+    {y:HORIZON+H*0.02, h:H*0.035, a:0.30, sp:1.0},
+    {y:HORIZON+H*0.05, h:H*0.045, a:0.42, sp:0.7},
+    {y:HORIZON+H*0.085,h:H*0.03,  a:0.28, sp:1.3}
+  ];
+  for(const b of bands){
+    const amp=H*0.006;
+    ctx.beginPath();
+    for(let x=0;x<=W;x+=24){ const yy=b.y-b.h/2+Math.sin(x*0.01+t*b.sp*6+b.y)*amp; x===0?ctx.moveTo(x,yy):ctx.lineTo(x,yy); }
+    for(let x=W;x>=0;x-=24){ const yy=b.y+b.h/2+Math.sin(x*0.012+t*b.sp*6+b.y+2)*amp; ctx.lineTo(x,yy); }
+    ctx.closePath();
+    ctx.fillStyle=rgb(mix([220,228,238],sky.hor,0.2), b.a*(1-rainK*0.3));
+    ctx.fill();
+  }
+}
+function drawFence(x0,y,w,col){
+  const posts=6, h=H*0.028;
+  ctx.strokeStyle=col; ctx.lineCap='round';
+  ctx.lineWidth=Math.max(1.5,h*0.09);
+  for(let i=0;i<=posts;i++){ const x=x0+w*(i/posts); ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y-h); ctx.stroke(); }
+  ctx.lineWidth=Math.max(1,h*0.05);
+  ctx.beginPath(); ctx.moveTo(x0,y-h*0.65); ctx.lineTo(x0+w,y-h*0.65-w*0.01); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x0,y-h*0.25); ctx.lineTo(x0+w,y-h*0.25-w*0.01); ctx.stroke();
+}
+function drawSceneWaterfall(sky,sun,moon,night,rainK,snowCover,heat){
+  drawRange(wfRanges[0], sky, sun.altitude, rainK, snowCover);
+  drawWaterfallRibbon(wfNotchX, HORIZON-H*0.20, HORIZON+H*0.05, sky, night, rainK);
+  drawRangeWithGap(wfRanges[1], sky, sun.altitude, rainK, snowCover, wfNotchX, W*0.016);
+  drawRangeWithGap(wfRanges[2], sky, sun.altitude, rainK, snowCover, wfNotchX, W*0.03);
+  drawWater(sky, sun, moon, night, rainK);
+  drawMistBands(sky, rainK);
+  const shoreY=H*0.92;
+  const shore=ctx.createLinearGradient(0,shoreY,0,H);
+  shore.addColorStop(0, rgb(mix(stormy([16,22,20],rainK*0.3),[222,230,240],snowCover*0.8)));
+  shore.addColorStop(1, rgb(mix(stormy([7,10,10],rainK*0.3),[198,210,226],snowCover*0.8)));
+  ctx.fillStyle=shore; ctx.fillRect(0,shoreY,W,H-shoreY);
+  drawFence(W*0.30, H*0.965, W*0.18, rgb(stormy([10,10,14],rainK*0.2)));
+  const treeCol=rgb(stormy([5,8,13], rainK*0.25));
+  for(const t of trees) drawPine(t, treeCol);
+}
+
 // ---- Snowy village ----
 let village=[];
 function buildVillage(){
@@ -885,9 +1005,10 @@ function drawLandscape(sky,sun,moon,night,rainK,snowCover,heat){
   else if(SCENE==='forest') drawSceneForest(sky,sun,moon,night,rainK,snowCover,heat);
   else if(SCENE==='aurora') drawSceneAurora(sky,sun,moon,night,rainK,snowCover,heat);
   else if(SCENE==='village')drawSceneVillage(sky,sun,moon,night,rainK,snowCover,heat);
+  else if(SCENE==='waterfall') drawSceneWaterfall(sky,sun,moon,night,rainK,snowCover,heat);
   else                      drawSceneMountains(sky,sun,moon,night,rainK,snowCover,heat);
 }
-function buildScenes(){ buildCity(); buildBeach(); buildDesert(); buildForest(); buildFireflies(); buildAurora(); buildVillage(); }
+function buildScenes(){ buildCity(); buildBeach(); buildDesert(); buildForest(); buildFireflies(); buildAurora(); buildVillage(); buildWaterfallValley(); }
 
 // ---------- photo relighting ----------
 function coverDraw(img){

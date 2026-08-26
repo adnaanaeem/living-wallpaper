@@ -16,7 +16,9 @@ const DEFAULTS = {
   monitor:    'all',       // 'all' or a display id (number as string)
   autostart:  false,
   pauseOnFullscreen: true,
-  sound:      false        // ambient rain/wind/cricket audio, off by default
+  sound:      false,       // ambient rain/wind/cricket audio, off by default
+  useAsScreensaver: false, // registers this app as the Windows screensaver (packaged app only)
+  useAsLockScreen: false   // periodically sets a scene snapshot as the Windows lock screen picture
 };
 
 function file() {
