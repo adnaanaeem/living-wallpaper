@@ -129,6 +129,12 @@ A single `<canvas>` with a `requestAnimationFrame` loop (`draw()`), all pure fun
   clicks pass through to the icons underneath), and enabling drag would mean enabling
   input capture, breaking that. A 4-way preset picker in Settings/Lively sidesteps the
   conflict entirely.
+- **HUD transparency:** `setHudOpacity(pct)` sets plain CSS `opacity` (0.15-1, clamped)
+  on the whole `#hud` div — a user-settable seek bar (Settings/Lively, 15-100%, default
+  100 = unchanged from before this existed). Deliberately a blanket opacity rather than
+  fading just the glass background: simplest, most predictable behaviour for a
+  "transparency" control, at the cost of also fading the text/numbers at low values —
+  the 15% floor exists so users can't drag it to fully invisible-and-undiscoverable.
 - **Swappable landscape:** `drawLandscape()` dispatches on the global `SCENE` to
   `drawSceneMountains / City / Beach / Desert / Forest / Aurora / Village`. Seeded
   geometry is built in `buildScenes()` (called from `resize()`). Forest reuses
@@ -155,10 +161,18 @@ A single `<canvas>` with a `requestAnimationFrame` loop (`draw()`), all pure fun
   soft-light (golden hour), and screen (sun/moon bloom) passes. Multi-photo cross-fade
   is handled by an override in `prod-boot.js`.
 - **HUD:** glass weather card (location, big temp + condition icon, clock+date, chips for
-  feels-like / humidity / wind / precip). It's a DOM overlay (`#hud` div), **not** drawn
-  into the canvas — matters if you ever want to screenshot the full look including the
-  HUD (see §8's canvas-screenshot workaround, which composites it in via an SVG
-  `foreignObject`).
+  feels-like / humidity / wind / precip / **sunrise / sunset**). It's a DOM overlay
+  (`#hud` div), **not** drawn into the canvas — matters if you ever want to screenshot
+  the full look including the HUD (see §8's canvas-screenshot workaround, which
+  composites it in via an SVG `foreignObject`). Sunrise/sunset chips just call the
+  existing `fmt(SUN_RISE)`/`fmt(SUN_SET)` in `updateHUD()`, so they inherit the 12/24h
+  setting automatically. **Deliberately not shown: moonrise/moonset or eclipses** — the
+  moon here is a stylized "rises at sunset, sets at sunrise" model (see the "Real
+  sunrise/sunset" note above), not real lunar ephemeris, and eclipse prediction needs
+  actual orbital mechanics (Sun-Earth-Moon alignment, Saros cycle data) well beyond the
+  simplified NOAA solar calculator this engine uses — showing either would mean
+  fabricated numbers next to the now-accurate real sunrise/sunset. Revisit only if a real
+  ephemeris source gets wired in.
 
 Open `engine-source.html` in a browser to develop: seek bar, scene dropdown, Rain
 toggle, Sound toggle, temperature slider, photo add, Live-weather button.
@@ -273,6 +287,7 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
   "clock":    "12|24",
   "clockStyle": "digital|analog",
   "hudPosition": "top-right|top-left|bottom-right|bottom-left",
+  "hudOpacity": 100,          // 15-100 (%), panel transparency
   "scene":    "mountains|city|beach|desert|forest|aurora|village|rotate|random",
   "showHud":  true,
   "photo":    "C:\\path\\img.jpg | null",     // single photo
@@ -317,6 +332,14 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 ---
 
 ## 6. Status — what's DONE
+- ✅ **HUD sunrise/sunset times + transparency slider.** The weather panel now shows
+  Sunrise/Sunset chips (`fmt(SUN_RISE)`/`fmt(SUN_SET)`, so they respect the 12/24h
+  setting automatically) and a Settings/Lively seek bar (15-100%, default 100) for the
+  panel's overall transparency. Deliberately **not** added: moonrise/moonset or eclipse
+  times — the moon here is a stylized "rises at sunset" model, not real lunar ephemeris,
+  and eclipses need real orbital-mechanics prediction this engine doesn't have; showing
+  either would just be fabricated numbers next to the now-accurate real sunrise/sunset.
+  See §3.1 for both.
 - ✅ **Sun/moon now genuinely bisected by the horizon at the exact real sunrise/sunset
   minute** — two bugs fixed (a ~29px vertical offset in `sunInfo()`/`moonInfo()`, and
   mountain ridges that happened to peak ~100px above the horizon exactly where the sun's

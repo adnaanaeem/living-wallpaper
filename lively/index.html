@@ -129,6 +129,8 @@
     <div class="chip"><div class="k">Humidity</div><div class="v" id="hudHum">—</div></div>
     <div class="chip"><div class="k">Wind</div><div class="v" id="hudWind">—</div></div>
     <div class="chip"><div class="k">Precip</div><div class="v" id="hudPrec">—</div></div>
+    <div class="chip"><div class="k">Sunrise</div><div class="v" id="hudSunrise">—</div></div>
+    <div class="chip"><div class="k">Sunset</div><div class="v" id="hudSunset">—</div></div>
   </div>
 </div>
 
@@ -1334,12 +1336,21 @@ const hudLoc=document.getElementById('hudLoc'), hudTemp=document.getElementById(
       hudClock=document.getElementById('hudClock'), hudDate=document.getElementById('hudDate'),
       hudClockAnalog=document.getElementById('hudClockAnalog'),
       hudFeels=document.getElementById('hudFeels'), hudHum=document.getElementById('hudHum'),
-      hudWind=document.getElementById('hudWind'), hudPrec=document.getElementById('hudPrec');
+      hudWind=document.getElementById('hudWind'), hudPrec=document.getElementById('hudPrec'),
+      hudSunrise=document.getElementById('hudSunrise'), hudSunset=document.getElementById('hudSunset');
 const HUD_POSITIONS=['top-right','top-left','bottom-right','bottom-left'];
 function setHudPosition(pos){
   const p = HUD_POSITIONS.includes(pos) ? pos : 'top-right';
   const hudEl = document.getElementById('hud');
   if(hudEl) hudEl.className = 'hud pos-' + p;
+}
+// pct: 15-100 (clamped). Applied as plain CSS opacity on the whole panel -
+// simplest, most predictable "transparency" behaviour (text fades along with
+// the background, same as any standard opacity slider); user-settable so they
+// can back off if it gets too hard to read.
+function setHudOpacity(pct){
+  const hudEl = document.getElementById('hud');
+  if(hudEl) hudEl.style.opacity = clamp((typeof pct==='number'?pct:100)/100, 0.15, 1);
 }
 let CLOCK_STYLE='digital'; // 'digital' | 'analog'
 function setClockStyle(style){ CLOCK_STYLE = (style==='analog') ? 'analog' : 'digital'; updateHUD(); }
@@ -1394,6 +1405,8 @@ function updateHUD(){
   const d=new Date();
   hudDate.textContent=`${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()} · ${ph}`;
   hudTemp.textContent=Math.round(temperature)+'°';
+  hudSunrise.textContent=fmt(SUN_RISE);
+  hudSunset.textContent=fmt(SUN_SET);
   const lw=liveWeather;
   hudIco.textContent=weatherIcon(lw?lw.code:null, night, temperature);
   if(lw){
@@ -1515,6 +1528,7 @@ setTimeout(resize,100); setTimeout(resize,500);
     scene:   'mountains',                // mountains|city|beach|desert|forest|aurora|village|waterfall|rotate|random
     showHud: true,
     hudPosition: 'top-right',            // top-right|top-left|bottom-right|bottom-left
+    hudOpacity: 100,                     // 15-100 (%), panel transparency
     photo:   null,                       // file:// URL or null
     location:null,                       // {lat,lon,name} or null -> auto (IP)
     theme:   'auto',
@@ -1733,6 +1747,10 @@ setTimeout(resize,100); setTimeout(resize,500);
     if(typeof setHudPosition === 'function') setHudPosition(CONFIG.hudPosition);
   }
 
+  function applyHudOpacity(){
+    if(typeof setHudOpacity === 'function') setHudOpacity(CONFIG.hudOpacity);
+  }
+
   // ---- scene selection (SCENE is an engine global) ----
   var SCENE_LIST = ['mountains','city','beach','desert','forest','aurora','village','waterfall'];
   function resolveScene(v){
@@ -1754,6 +1772,7 @@ setTimeout(resize,100); setTimeout(resize,500);
     applyPhoto();
     applyHudVisibility();
     applyHudPosition();
+    applyHudOpacity();
     applySound();
     applyClockStyle();
     syncUI();       // re-render clock (picks up new format)
@@ -1806,6 +1825,7 @@ setTimeout(resize,100); setTimeout(resize,500);
     else if(name==='sound')    applyConfig({ sound: !!val });
     else if(name==='clockStyle'){ var cs=['Digital','Analog']; var ci=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ clockStyle: (cs[ci]||'Digital').toLowerCase() }); }
     else if(name==='hudPosition'){ var hp=['top-right','top-left','bottom-right','bottom-left']; var hi=(typeof val==='number')?val:parseInt(val,10)||0; applyConfig({ hudPosition: hp[hi]||'top-right' }); }
+    else if(name==='hudOpacity') applyConfig({ hudOpacity: (typeof val==='number')?val:(parseFloat(val)||100) });
   };
   // Lively lifecycle (pause when a fullscreen app is focused)
   window.livelyWallpaperPlaybackChanged = function(e){
@@ -1817,6 +1837,7 @@ setTimeout(resize,100); setTimeout(resize,500);
   applyPhoto();
   applyHudVisibility();
   applyHudPosition();
+  applyHudOpacity();
   applySound();
   applyClockStyle();
   applyUnits();

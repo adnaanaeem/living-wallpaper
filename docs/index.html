@@ -128,6 +128,8 @@
     <div class="chip"><div class="k">Humidity</div><div class="v" id="hudHum">—</div></div>
     <div class="chip"><div class="k">Wind</div><div class="v" id="hudWind">—</div></div>
     <div class="chip"><div class="k">Precip</div><div class="v" id="hudPrec">—</div></div>
+    <div class="chip"><div class="k">Sunrise</div><div class="v" id="hudSunrise">—</div></div>
+    <div class="chip"><div class="k">Sunset</div><div class="v" id="hudSunset">—</div></div>
   </div>
 </div>
 
@@ -1332,12 +1334,21 @@ const hudLoc=document.getElementById('hudLoc'), hudTemp=document.getElementById(
       hudClock=document.getElementById('hudClock'), hudDate=document.getElementById('hudDate'),
       hudClockAnalog=document.getElementById('hudClockAnalog'),
       hudFeels=document.getElementById('hudFeels'), hudHum=document.getElementById('hudHum'),
-      hudWind=document.getElementById('hudWind'), hudPrec=document.getElementById('hudPrec');
+      hudWind=document.getElementById('hudWind'), hudPrec=document.getElementById('hudPrec'),
+      hudSunrise=document.getElementById('hudSunrise'), hudSunset=document.getElementById('hudSunset');
 const HUD_POSITIONS=['top-right','top-left','bottom-right','bottom-left'];
 function setHudPosition(pos){
   const p = HUD_POSITIONS.includes(pos) ? pos : 'top-right';
   const hudEl = document.getElementById('hud');
   if(hudEl) hudEl.className = 'hud pos-' + p;
+}
+// pct: 15-100 (clamped). Applied as plain CSS opacity on the whole panel -
+// simplest, most predictable "transparency" behaviour (text fades along with
+// the background, same as any standard opacity slider); user-settable so they
+// can back off if it gets too hard to read.
+function setHudOpacity(pct){
+  const hudEl = document.getElementById('hud');
+  if(hudEl) hudEl.style.opacity = clamp((typeof pct==='number'?pct:100)/100, 0.15, 1);
 }
 let CLOCK_STYLE='digital'; // 'digital' | 'analog'
 function setClockStyle(style){ CLOCK_STYLE = (style==='analog') ? 'analog' : 'digital'; updateHUD(); }
@@ -1392,6 +1403,8 @@ function updateHUD(){
   const d=new Date();
   hudDate.textContent=`${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()} · ${ph}`;
   hudTemp.textContent=Math.round(temperature)+'°';
+  hudSunrise.textContent=fmt(SUN_RISE);
+  hudSunset.textContent=fmt(SUN_SET);
   const lw=liveWeather;
   hudIco.textContent=weatherIcon(lw?lw.code:null, night, temperature);
   if(lw){

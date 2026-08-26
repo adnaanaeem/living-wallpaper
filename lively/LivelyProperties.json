@@ -28,6 +28,14 @@
     "items": [ "Top right", "Top left", "Bottom right", "Bottom left" ],
     "value": 0
   },
+  "hudOpacity": {
+    "text": "Weather panel transparency (%)",
+    "type": "slider",
+    "min": 15,
+    "max": 100,
+    "step": 5,
+    "value": 100
+  },
   "scene": {
     "text": "Illustrated scene",
     "type": "dropdown",

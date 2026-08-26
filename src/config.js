@@ -8,6 +8,7 @@ const DEFAULTS = {
   clock:      '12',        // '12' or '24' hour clock
   clockStyle: 'digital',   // 'digital' or 'analog'
   hudPosition: 'top-right', // top-right|top-left|bottom-right|bottom-left
+  hudOpacity: 100,         // 15-100 (%), panel transparency
   scene:      'mountains', // mountains|city|beach|desert|forest|aurora|village|rotate|random
   showHud:    true,
   photo:      null,        // absolute path to a single image, or null
@@ -49,6 +50,7 @@ function toRenderer(cfg) {
     clock:    cfg.clock,
     clockStyle: cfg.clockStyle,
     hudPosition: cfg.hudPosition,
+    hudOpacity: cfg.hudOpacity,
     scene:    cfg.scene,
     showHud:  cfg.showHud,
     photo:    cfg.photo ? toUrl(cfg.photo) : null,
