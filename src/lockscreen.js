@@ -23,7 +23,16 @@ function scriptPath() {
 async function snapshotAndSet(win) {
   if (!win || win.isDestroyed()) return;
   try {
+    // This snapshot only refreshes on an interval, so a baked-in clock would
+    // visibly drift from Windows' own live lock-screen clock between
+    // refreshes - hide just the clock for the capture (rest of the weather
+    // HUD is fine slightly stale) via the engine's own suppression flag, so
+    // there's no race with updateHUD()'s own periodic redraw.
+    const hide = "if(typeof setHudClockSuppressed==='function') setHudClockSuppressed(true);";
+    const show = "if(typeof setHudClockSuppressed==='function') setHudClockSuppressed(false);";
+    await win.webContents.executeJavaScript(hide).catch(() => {});
     const img = await win.webContents.capturePage();
+    await win.webContents.executeJavaScript(show).catch(() => {});
     fs.writeFileSync(imagePath(), img.toPNG());
     setWindowsLockScreen(imagePath());
   } catch (e) { console.warn('[lockscreen] snapshot failed:', e.message); }

@@ -121,7 +121,32 @@ A single `<canvas>` with a `requestAnimationFrame` loop (`draw()`), all pure fun
   (ticks, hour/minute hands) onto the `#hudClockAnalog` canvas inside the HUD — a DOM
   canvas, not the main scene canvas, since it only needs to redraw on `updateHUD()`
   ticks, not every animation frame. `setClockStyle()` is the engine-level setter;
-  `prod-boot.js`'s `applyClockStyle()` calls it from `CONFIG.clockStyle`.
+  `prod-boot.js`'s `applyClockStyle()` calls it from `CONFIG.clockStyle`. `drawAnalogClock()`
+  resizes the canvas's own backing store to `56*DPR` (matching the main scene canvas's own
+  DPR handling) and resets the 2D context transform to that scale before drawing, keeping
+  all its drawing math in fixed 56-CSS-pixel units — found and fixed a real bug where it
+  drew straight at the HTML `width="56" height="56"` backing resolution with no DPR
+  scaling at all, rendering blurry on any >100% Windows display scaling (125%/150%/200% —
+  the common case, not the exception). Verified by forcing `DPR` to 1/1.5/2 and checking
+  the canvas's backing pixel size scales (56/84/112) while its CSS size stays fixed at
+  56px, then visually confirming the face renders crisp at 2x.
+  **Separate bug in the same area, found by measuring `getBoundingClientRect()` rather
+  than trusting a screenshot glance:** the analog clock rendered pinned to the whole
+  `#hud` panel's top-left corner, overlapping the location row, instead of sitting next
+  to the date inside `.hud-time` where its DOM position (and the digital clock's
+  equivalent spot) says it should. Root cause: the file's one bare `canvas{}` rule (line
+  ~11, `position:absolute; inset:0; width:100%; height:100%;`) is meant only for the
+  fullscreen scene canvas `#c`, but a bare element-type selector matches *every*
+  `<canvas>` — including `#hudClockAnalog`. My inline `cv.style.width/height` (from the
+  DPR fix above) happened to override the `width`/`height` part, which is why the canvas
+  was the right *size* and easy to mistake for correct, but `position`/`inset` were never
+  touched, so it stayed absolutely pinned to `inset:0` of its nearest positioned
+  ancestor (`#hud`, `position:fixed`). Fixed with an explicit `.hud-clock-analog{
+  position:static; inset:auto; ...}` override. If you ever add another `<canvas>`
+  anywhere inside `#hud` (or anywhere that isn't the fullscreen scene layer), it will
+  silently inherit this same absolute/inset:0 positioning unless explicitly reset —
+  check `getComputedStyle(el).position`, not just whether the element *looks* roughly
+  right in a screenshot.
 - **HUD position:** `setHudPosition()` swaps the `#hud` div's class between
   `pos-top-right`/`pos-top-left`/`pos-bottom-right`/`pos-bottom-left` (CSS only — each
   just sets `top`/`bottom`/`left`/`right`). No true drag-to-reposition: the wallpaper
@@ -251,25 +276,45 @@ An IIFE appended after the engine that turns the demo into a real wallpaper:
   classic dialog itself writes) — `ScreenSaveTimeOut` is only set if the user doesn't
   already have one, so an existing idle-timeout preference isn't silently overridden.
   Packaged app only (`app.isPackaged`), same guard pattern as auto-update.
-- **`lockscreen.js` — periodic lock-screen snapshot (currently non-functional on modern
-  Windows 11, see §6/§8 — kept as best-effort, do not advertise as working).** The
-  Windows lock screen renders on a separate secure desktop that no regular process can
-  draw into, so there's no way to make it animate live. When Settings' **"Use as lock
+- **`lockscreen.js` — periodic lock-screen snapshot. Best-effort, Windows-build-
+  dependent — confirmed non-functional on one real Windows 11 build (10.0.26200, this
+  dev machine) but confirmed WORKING by an end user on their own machine.** The Windows
+  lock screen renders on a separate secure desktop that no regular process can draw
+  into, so there's no way to make it animate live. When Settings' **"Use as lock
   screen"** toggle is on, every 30 minutes `lockscreen.js` grabs
   `webContents.capturePage()` from the primary wallpaper window, saves it to
   `%APPDATA%/Living Wallpaper/lockscreen.png`, and calls the WinRT
   `Windows.System.UserProfile.LockScreen.SetImageFileAsync` API — reached from Node
   without any native module by shelling out to `powershell.exe` with
   `ContentType=WindowsRuntime` type activation (the same technique apps like Bing
-  Wallpaper have historically used). The call itself succeeds and updates its own
-  metadata (`LockScreen.OriginalImageFile`), but was confirmed live on a real Windows 11
-  build (10.0.26200) to **not** change what's actually rendered on the lock screen —
-  see §6's writeup for what was ruled out (Spotlight, slideshow, group policy) and the
-  likely cause (the modern lock screen renderer is a separate system app that appears
-  not to source its background from this call anymore). See the §8 gotcha for why the
-  PowerShell side needs a reflection-based `AsTask` awaiter rather than the naively-
-  expected `.Status`/`.GetResults()` — that part *is* solid; the non-functional part is
-  specifically the OS actually honoring the change.
+  Wallpaper have historically used). On this dev machine the call succeeds and updates
+  its own metadata (`LockScreen.OriginalImageFile`) but doesn't change what's actually
+  rendered — see §6's writeup for what was ruled out (Spotlight, slideshow, group
+  policy) and the likely cause (the modern lock screen renderer is a separate system
+  app that appears not to source its background from this call anymore) — yet it *does*
+  visibly work end-to-end on the reporting user's real machine, so whatever gates this
+  varies by Windows build/config in a way not yet root-caused. Don't assume it's broken
+  everywhere just because it was broken here, and don't assume it's fixed everywhere
+  just because a user confirmed it once. See the §8 gotcha for why the PowerShell side
+  needs a reflection-based `AsTask` awaiter rather than the naively-expected
+  `.Status`/`.GetResults()` — that part *is* solid regardless of the OS-honoring
+  question.
+  - **Clock-mismatch bug, found once a user had it actually working:** because the
+    snapshot only refreshes every 30 min, its baked-in HUD clock visibly drifted from
+    Windows' own live lock-screen clock in between refreshes — obviously wrong to
+    anyone glancing at both. `capturePage()` grabs the whole rendered page (DOM +
+    canvas), so the HUD's clock chip was baked into the picture right along with
+    everything else. Fixed by hiding *just* the clock (not the rest of the weather
+    HUD, which goes stale much less noticeably) for the capture: a new
+    `HUD_CLOCK_SUPPRESSED` flag + `setHudClockSuppressed(v)` in
+    `tools/engine-source.html`'s `updateHUD()`, toggled by `lockscreen.js` via
+    `executeJavaScript` immediately before/after `capturePage()`. Deliberately a flag
+    checked *inside* `updateHUD()` itself, not a one-off `style.display` write from
+    outside — `updateHUD()` already re-runs every 15s (real-clock tick) independently of
+    the snapshot, so a plain external hide could get raced and undone before the
+    capture actually happened; gating inside `updateHUD()` means every tick respects
+    the flag regardless of timing. Verified: forced an `updateHUD()` tick while
+    suppressed and confirmed the clock stayed hidden (both digital and analog styles).
 
 ### 3.4 Native dependency note (important)
 `electron-as-wallpaper@^2` compiles a **Rust (Neon / N-API)** module at `npm install`.
@@ -332,6 +377,18 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 ---
 
 ## 6. Status — what's DONE
+- ✅ **Lock-screen clock mismatch, analog clock blur, and analog clock mispositioning —
+  three bugs, all fixed in the same pass.** Found from user reports once the lock-screen
+  feature was confirmed actually working on their machine: (1) the snapshot's baked-in
+  HUD clock visibly drifted from Windows' own live lock-screen clock between the 30-min
+  refreshes — fixed by suppressing just the clock (not the rest of the weather HUD)
+  during the capture; (2) the analog clock style rendered blurry on any >100% Windows
+  display scaling because its canvas never scaled its backing store by DPR (unlike the
+  main scene canvas, which always has); (3) the analog clock also rendered pinned to the
+  HUD panel's top-left corner (overlapping the location text) instead of next to the
+  date, because a bare `canvas{}` CSS rule meant only for the fullscreen scene canvas
+  was leaking `position:absolute;inset:0` onto every other canvas too. See §3.1 for the
+  technical detail on all three.
 - ✅ **HUD sunrise/sunset times + transparency slider.** The weather panel now shows
   Sunrise/Sunset chips (`fmt(SUN_RISE)`/`fmt(SUN_SET)`, so they respect the 12/24h
   setting automatically) and a Settings/Lively seek bar (15-100%, default 100) for the

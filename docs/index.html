@@ -71,7 +71,13 @@
   .hud-cond { font-size:13px; opacity:0.85; margin-bottom:12px; }
   .hud-time { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .hud-clock { font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:0.5px; }
-  .hud-clock-analog { flex:none; filter:drop-shadow(0 1px 4px rgba(0,0,0,0.35)); }
+  /* The bare `canvas{}` rule above (meant for the fullscreen scene canvas)
+     also matches this one and pins it via position:absolute;inset:0 to the
+     #hud panel's own top-left corner, overlapping the location row instead
+     of sitting in its normal flex-flow spot next to the date. Reset both
+     back to normal flow. */
+  .hud-clock-analog { position:static; inset:auto; flex:none; width:56px; height:56px;
+    filter:drop-shadow(0 1px 4px rgba(0,0,0,0.35)); }
   .hud-date { font-size:12px; opacity:0.65; }
   .hud-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .chip { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.08);
@@ -1354,7 +1360,18 @@ let CLOCK_STYLE='digital'; // 'digital' | 'analog'
 function setClockStyle(style){ CLOCK_STYLE = (style==='analog') ? 'analog' : 'digital'; updateHUD(); }
 function drawAnalogClock(m){
   const cv=hudClockAnalog; if(!cv) return;
-  const c2=cv.getContext('2d'), size=cv.width, r=size/2;
+  // The canvas's backing store must scale with devicePixelRatio (same as the
+  // main scene canvas) or it renders blurry on any >100% Windows display
+  // scaling - extremely common. Keep all drawing math in CSS-pixel units
+  // (size=56) and let the transform scale it up to match the real backing
+  // resolution, rather than baking DPR into every coordinate below.
+  const size=56, wantPx=Math.round(size*DPR);
+  if(cv.width!==wantPx || cv.height!==wantPx){
+    cv.width=wantPx; cv.height=wantPx;
+    cv.style.width=size+'px'; cv.style.height=size+'px';
+  }
+  const c2=cv.getContext('2d'), r=size/2;
+  c2.setTransform(DPR,0,0,DPR,0,0);
   c2.clearRect(0,0,size,size);
   const mm=((m%1440)+1440)%1440, hourAngle=((mm/60)%12)/12*Math.PI*2, minAngle=(mm%60)/60*Math.PI*2;
   c2.beginPath(); c2.arc(r,r,r-2,0,Math.PI*2);
@@ -1390,9 +1407,18 @@ function weatherIcon(code, night, temp){
   if(code<=86) return '❄️';
   return '⛈️';
 }
+// Set true only while grabbing a static lock-screen snapshot (see
+// lockscreen.js): that picture only refreshes on an interval, so a baked-in
+// clock would visibly drift from Windows' own live lock-screen clock between
+// refreshes. Hiding just the clock (not the rest of the weather HUD, which
+// goes stale much less noticeably) removes the thing that visibly conflicts.
+let HUD_CLOCK_SUPPRESSED=false;
+function setHudClockSuppressed(v){ HUD_CLOCK_SUPPRESSED=!!v; updateHUD(); }
 function updateHUD(){
   const alt=sunInfo(minutes).altitude, night=alt<=0.02;
-  if(CLOCK_STYLE==='analog'){
+  if(HUD_CLOCK_SUPPRESSED){
+    hudClock.style.display='none'; hudClockAnalog.style.display='none';
+  } else if(CLOCK_STYLE==='analog'){
     hudClock.style.display='none'; hudClockAnalog.style.display='block';
     drawAnalogClock(minutes);
   } else {
