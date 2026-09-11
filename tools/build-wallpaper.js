@@ -49,11 +49,13 @@ html = html.replace('</style>',
   '  /* production: hide interactive demo chrome */\n  .panel{display:none!important;} .title{display:none!important;}\n</style>');
 
 // 2) Pause guard inside the draw loop (Electron/Lively pause to save resources).
-// Goes before the FPS-cap check (not after) so a paused wallpaper doesn't even
-// touch that branch.
+// Goes before the frame-budget check (not after) so a paused wallpaper doesn't
+// even touch that branch. Anchor deliberately stops right at the frame-budget
+// check (not the dt line after it) so a comment edit near the dt clamp can't
+// silently break this match.
 html = html.replace(
-  'function draw(now){\n  if(now-t0<FRAME_MS){ requestAnimationFrame(draw); return; }\n  const dt=Math.min(40, now-t0); t0=now;',
-  'function draw(now){\n  if(window.__lwPaused){ t0=now; setTimeout(function(){requestAnimationFrame(draw);},250); return; }\n  if(now-t0<FRAME_MS){ requestAnimationFrame(draw); return; }\n  const dt=Math.min(40, now-t0); t0=now;'
+  'function draw(now){\n  if(now-t0<currentFrameBudget())',
+  'function draw(now){\n  if(window.__lwPaused){ t0=now; setTimeout(function(){requestAnimationFrame(draw);},250); return; }\n  if(now-t0<currentFrameBudget())'
 );
 
 // 3) Inject the production boot script just before </body>.

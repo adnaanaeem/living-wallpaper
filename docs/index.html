@@ -1112,18 +1112,33 @@ function drawPhotoScene(sky,sun,moon,night,rainK,cold,heat){
 
 // ---------- main draw ----------
 let t0=performance.now();
-// Caps redraws at 30fps regardless of display refresh rate - this used to run
-// requestAnimationFrame uncapped (60/120/144Hz depending on the monitor) forever,
-// which is why the packaged wallpaper (src/wallpaper.html, backgroundThrottling
-// disabled so it keeps animating while it's never focused) drove sustained high
-// GPU usage the entire time it was active. Every animated element already moves
-// via dt-relative math (e.g. `x += speed*(dt/16)`), so sampling less often only
-// reduces work done - it doesn't change perceived speed or smoothness for this
-// kind of slow ambient motion (clouds, rain, the sun's position).
-const FRAME_MS=1000/30;
+// Redraw cadence adapts to what's actually animating fast: full ~24fps only
+// while precipitation, a shooting star, or a fading rainbow needs smooth
+// motion; otherwise ~6fps, since the sun/moon position and cloud drift move
+// slowly enough that this still reads as smooth ambient motion - a flat 30fps
+// cap (the first attempt at this fix) helped but wasn't enough on integrated
+// graphics with 2+ monitors, each running a full separate renderer. This
+// originally ran requestAnimationFrame uncapped (60/120/144Hz depending on
+// the monitor) forever - on top of backgroundThrottling:false (needed so the
+// wallpaper keeps animating while it's never focused) - which is why it drove
+// sustained high GPU usage for as long as it was active. Every animated
+// element already moves via dt-relative math (e.g. `x += speed*(dt/16)`), so
+// sampling less often only reduces work done - it doesn't change perceived
+// speed for slow ambient motion.
+const FRAME_MS_ACTIVE=1000/24, FRAME_MS_IDLE=1000/6;
+function currentFrameBudget(){
+  const active = rainLevel>0.02 || shootingStars.length>0 || rainbowLevel>0.01;
+  return active ? FRAME_MS_ACTIVE : FRAME_MS_IDLE;
+}
 function draw(now){
-  if(now-t0<FRAME_MS){ requestAnimationFrame(draw); return; }
-  const dt=Math.min(40, now-t0); t0=now;
+  if(now-t0<currentFrameBudget()){ requestAnimationFrame(draw); return; }
+  // Was Math.min(40, ...) - fine while frames were always ~16-33ms apart, but
+  // the idle cadence above (~166ms) blew past that on *every* idle frame,
+  // silently clamping the simulated clock's progress and making the sun/moon
+  // position and cloud drift run in slow motion whenever the scene was calm.
+  // 200ms comfortably covers both cadences above while still guarding against
+  // a genuinely large stall (e.g. the window being minimized for a while).
+  const dt=Math.min(200, now-t0); t0=now;
   if(W<2||H<2){ resize(); if(W<2||H<2){ requestAnimationFrame(draw); return; } }
 
   if(playing){ minutes=(minutes+dt*0.02)%1440; syncUI(); }
