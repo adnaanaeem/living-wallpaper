@@ -1111,7 +1111,17 @@ function drawPhotoScene(sky,sun,moon,night,rainK,cold,heat){
 
 // ---------- main draw ----------
 let t0=performance.now();
+// Caps redraws at 30fps regardless of display refresh rate - this used to run
+// requestAnimationFrame uncapped (60/120/144Hz depending on the monitor) forever,
+// which is why the packaged wallpaper (src/wallpaper.html, backgroundThrottling
+// disabled so it keeps animating while it's never focused) drove sustained high
+// GPU usage the entire time it was active. Every animated element already moves
+// via dt-relative math (e.g. `x += speed*(dt/16)`), so sampling less often only
+// reduces work done - it doesn't change perceived speed or smoothness for this
+// kind of slow ambient motion (clouds, rain, the sun's position).
+const FRAME_MS=1000/30;
 function draw(now){
+  if(now-t0<FRAME_MS){ requestAnimationFrame(draw); return; }
   const dt=Math.min(40, now-t0); t0=now;
   if(W<2||H<2){ resize(); if(W<2||H<2){ requestAnimationFrame(draw); return; } }
 

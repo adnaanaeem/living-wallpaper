@@ -4,7 +4,12 @@ on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      build_mac:
+        description: 'Also build the experimental macOS .dmg (see build-mac job)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # needed to publish releases on tags
@@ -75,3 +80,51 @@ jobs:
             dist/LivingWallpaper-Lively.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Experimental, manual-only - NOT wired into the automatic push/tag build
+  # above, and never attached to a GitHub Release. `main.js`'s
+  # attachBehindIcons() explicitly no-ops on anything but win32, so this
+  # produces a real .dmg that installs and opens a real window, but that
+  # window does NOT attach behind the desktop icons like it does on Windows -
+  # there's no macOS equivalent of the Progman/WorkerW technique implemented
+  # yet. Useful for early packaging/dev testing once that's built; not a
+  # real release artifact until then. Trigger manually with build_mac: true.
+  build-mac:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_mac }}
+    runs-on: macos-latest
+    continue-on-error: true # genuinely untested - electron-as-wallpaper's
+                             # native module has only ever been built for Windows here
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/package.json') }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build .dmg (electron-builder, unsigned)
+        run: npm run dist:mac
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LivingWallpaper-macos-experimental
+          path: dist/*.dmg
+          if-no-files-found: warn

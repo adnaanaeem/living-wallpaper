@@ -1,7 +1,7 @@
 {
   "name": "living-wallpaper",
   "productName": "Living Wallpaper",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "description": "Live day-cycle & weather desktop wallpaper for Windows",
   "author": { "name": "adnaanaeem", "email": "jbsia.dani@gmail.com" },
   "license": "MIT",
@@ -11,6 +11,7 @@
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
     "pack": "electron-builder --dir"
   },
   "dependencies": {
@@ -29,6 +30,10 @@
     "win": {
       "target": [ { "target": "nsis", "arch": [ "x64" ] } ],
       "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [ { "target": "dmg", "arch": [ "universal" ] } ],
+      "category": "public.app-category.utilities"
     },
     "nsis": {
       "oneClick": false,
