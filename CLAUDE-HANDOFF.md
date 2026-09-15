@@ -364,6 +364,20 @@ node tools/build-wallpaper.js      # regenerate src/wallpaper.html + lively/inde
 npm install          # needs Rust toolchain for the native module
 npm start
 ```
+If `npm install` fails with `'cargo' is not recognized` (this machine didn't have Rust
+installed until this session), get it with:
+```bash
+Invoke-WebRequest -Uri "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe" -OutFile "$env:TEMP\rustup-init.exe"
+& "$env:TEMP\rustup-init.exe" -y --default-toolchain stable   # -y: non-interactive, needed since rustup-init otherwise waits on a prompt this tool can't answer
+```
+Then, in a **git-bash** session specifically, `export PATH="/c/Users/<you>/.cargo/bin:$PATH"`
+before `npm install` — not `$USERPROFILE/.cargo/bin`. That env var expands to a raw
+Windows path (`C:\Users\...`), and mixing that into bash's colon-separated `PATH`
+produces an entry MSYS's automatic path translation doesn't recognize, so `cargo`
+resolves fine for bash's own direct calls but silently fails once `npm install` shells
+out to `cmd.exe` to run `electron-as-wallpaper`'s native build step (confirmed the hard
+way — same error, `cargo` provably installed and on `PATH` by every other check, until
+switching to the POSIX-style `/c/...` form).
 
 ### Build the installer
 ```bash
@@ -377,6 +391,48 @@ Import `lively/` (zip its contents, or select `index.html`). Customize for scene
 ---
 
 ## 6. Status — what's DONE
+- ✅ **Adaptive redraw rate to fix sustained high GPU usage (v1.0.15 → v1.0.17)  -
+  shipped, but the final numbers are NOT YET CONFIRMED by the reporting user as of this
+  handoff.** See §8 for the full technical writeup; this entry is the outcome/status
+  summary. User's report: GPU usage "shoots up" the instant the wallpaper loads and
+  stays high (not a brief spike) until the app closes or the wallpaper changes - root
+  cause was `draw()` calling `requestAnimationFrame` completely uncapped (60/120/144Hz
+  depending on the monitor) forever, combined with `backgroundThrottling:false` on the
+  wallpaper `BrowserWindow` (needed so it keeps animating while it's never focused, but
+  it also means Chromium never throttles it down on its own either).
+  - **v1.0.15**: flat 30fps cap. User-measured: **80-90% → 56% GPU** on their machine
+    (2+ monitors, integrated graphics) - a real improvement, confirmed insufficient.
+  - **v1.0.16**: adaptive cadence - ~24fps only while rain/snow/a shooting star/a
+    fading rainbow is actually animating, ~6fps otherwise (the sun/moon position and
+    cloud drift move slowly enough that this still reads as smooth ambient motion).
+    **Never committed to git** - built locally and handed to the user directly as an
+    installer to try, superseded by v1.0.17 before being tagged/pushed. If you're
+    looking for a `v1.0.16` tag or release, it doesn't exist - this is why, not an
+    error.
+  - **v1.0.17**: same adaptive cadence, plus a real bug the adaptive change exposed -
+    the pre-existing `dt=Math.min(40, now-t0)` safety clamp (guards against huge
+    jumps, e.g. after the window is minimized for a while) was tuned for the ~16-33ms
+    gaps normal frame rates produce, and started firing on **every single idle-state
+    frame** once those are naturally ~166ms apart (1000/6) - silently capping how much
+    simulated time each frame credited, which would have made the sun/moon position
+    and cloud drift quietly run in slow motion during calm scenes. Raised to 200ms,
+    comfortably above both the ~42ms (1000/24) active and ~166ms idle cadences.
+    Committed, tagged, pushed, and released via the existing CI pipeline (§5/§8).
+  - **What's still open**: whether v1.0.17's idle-state GPU usage is actually low
+    enough on the reporting user's 2-monitor/integrated-graphics setup hasn't been
+    confirmed yet - last exchange before this handoff was rain/snow-free "evening,
+    shooting stars" causing a temporary bump on the pre-fix build, not a same-scene
+    before/after comparison on v1.0.17 itself. **Ask for a fresh Task Manager reading
+    on v1.0.17 before considering this fully resolved.** If 2 monitors on integrated
+    graphics is still too much even at ~6fps idle, the next lever isn't a lower FPS
+    number (diminishing returns, and going much below ~6fps risks visibly janky sun/
+    cloud motion) - it's the fact that each monitor runs its own **entire independent
+    Chromium renderer process**, each redoing the same expensive scene computation and
+    canvas painting from scratch. A real fix at that point would mean rendering once
+    and mirroring the result to the other window(s) (e.g. render to an
+    `OffscreenCanvas`/backing bitmap in one process and transfer/copy the frame to the
+    others via IPC) rather than N independent full renders - a genuinely bigger
+    architectural change, not another throttling tweak.
 - ✅ **Lock-screen clock mismatch, analog clock blur, and analog clock mispositioning —
   three bugs, all fixed in the same pass.** Found from user reports once the lock-screen
   feature was confirmed actually working on their machine: (1) the snapshot's baked-in
@@ -712,11 +768,29 @@ guess:
   thunder) to modulate clouds/visibility, not just precipitation.
 - ⬜ **Photo cross-fade UI** — reorder/time-tag photos in settings (currently evenly
   spaced by order).
-- ⬜ **Performance** — FPS cap / lower-power mode on battery; pause when display sleeps.
-- ⬜ **Android app** — the original goal. Reuse the canvas engine in a `WallpaperService`
-  via a WebView, or port `draw()` to Kotlin/Canvas. Weather/location layer reusable.
+- ⬜ **Performance** — FPS cap done (see §6/§8 - v1.0.17, adaptive 24fps/6fps); pause
+  when display sleeps is still open. If the adaptive rate turns out insufficient for
+  multi-monitor + integrated-graphics setups (not yet confirmed either way - see §6),
+  the real next step is one-render-many-windows instead of N independent renderers, not
+  a further FPS reduction.
+- ⬜ **Android app** — **done, and then some** - see
+  `E:\Claude-Tools\LivingWallpaper-Android\CLAUDE-HANDOFF.md`. Not a Kotlin/WebView port
+  of this engine after all; it's a from-scratch Kotlin/Canvas re-implementation of the
+  Mountains scene's math (no shared code, no build step keeping them in sync - porting a
+  change here means re-reading this engine and re-implementing the relevant piece in
+  Kotlin by hand). Already shipped to Google Play (package
+  `com.jarvis.apps.living.wallpapers`) with its own icon, HUD widgets, a fast-forward
+  preview screen, and considerably more.
 - ⬜ **Distribution** — Microsoft Store / winget listing. (Auto-update is already done —
   see §6.)
+- ⬜ **macOS build** — CI now has a `build-mac` job (manual `workflow_dispatch` only,
+  `continue-on-error: true`, never attached to a release) producing an unsigned `.dmg`,
+  added purely as scaffolding for whenever real support lands. `main.js`'s
+  `attachBehindIcons()` explicitly no-ops on anything but `win32` — there is no macOS
+  equivalent of the Windows Progman/WorkerW technique implemented, so today's mac build
+  would package and open a normal floating window, not a real desktop wallpaper. Needs
+  an actual native mechanism (NSWindow-level desktop attachment) before this job is
+  worth wiring into the automatic release, or worth trusting as a real artifact.
 
 ## 8. Gotchas / lessons learned
 - `src/wallpaper.html` & `lively/index.html` are **generated** — edit `tools/` sources.
@@ -839,12 +913,78 @@ guess:
   value as proof the lock screen actually changed — verify visually (lock the session)
   before ever calling this "done."
 
+- **A `dt` safety clamp tuned for one frame rate silently breaks at another.**
+  `draw()`'s `dt=Math.min(N, now-t0)` exists to stop the simulation from lurching after
+  a real stall (e.g. the window minimized for a while) - fine as long as `N` stays well
+  above the gap between *normal* frames. Introducing frame-rate throttling (see §6/§7's
+  adaptive-cadence entry) changed what "normal" means for the gap between frames, and
+  the old `N=40` (tuned for ~16-33ms/60-30fps gaps) started firing on *every* idle-state
+  frame once those became ~166ms apart by design - silently under-crediting elapsed
+  time every single frame, not just during genuine stalls. The bug was invisible in
+  code review (the clamp still *looks* like a reasonable safety net) and only showed up
+  as "things move slower than they should" behavior. Any time you change how often
+  `draw()`/an equivalent tick function actually runs, re-check every `Math.min`/
+  `Math.max` clamp downstream of the elapsed-time value against the *new* normal gap,
+  not just the original one it was tuned for.
+- **Rare-event spawn checks that scale a per-frame probability by `dt` (e.g.
+  `Math.random()<0.0006*dt` for shooting stars) are the mathematically correct way to
+  keep the same long-run event rate independent of frame rate** - probability-per-
+  frame ≈ probability-per-unit-time × dt, so halving the frame rate roughly doubles
+  each check's probability, keeping checks-per-second × probability roughly constant.
+  This only holds while `dt` stays small enough that the per-frame probability stays
+  well under 1, though - worth rechecking by hand (expected events/sec = frame-rate ×
+  per-frame-probability, using the *clamped* dt actually reaching the check) whenever
+  either the frame rate or the dt clamp changes materially, rather than assuming the
+  original tuning still applies.
+- **Two viewers of the same GPU-usage complaint can mean two different things at
+  different points in the same debugging session** - "GPU usage shoots up" (this
+  session's actual bug report) turned out to describe *sustained* high usage for as
+  long as the wallpaper was active, not a brief startup spike; a later "it's at 90%
+  again" turned out to be a legitimate different cause (a rare shooting-star event
+  correctly triggering the higher-rate branch), not evidence the fix regressed. Ask
+  what was actually on screen (weather, time of day, anything currently animating)
+  before assuming a fresh GPU-percentage report is describing the same phenomenon as
+  the original complaint.
+- **Multiple monitors multiply Electron wallpaper cost near-linearly, since each one is
+  a fully independent `BrowserWindow`/renderer process** (see `createWallpaperWindows()`
+  in `main.js`, and §8's existing "never span multiple monitors in one window" entry -
+  that constraint is *why* this multiplication exists, and it's the right tradeoff for
+  correctness, just expensive). On integrated/shared graphics this is where headroom
+  disappears fastest; a fix that looks sufficient on a single-monitor/dedicated-GPU dev
+  machine may not be on a 2+-monitor/integrated-graphics user's machine. Ask about
+  monitor count and GPU type (integrated vs dedicated) early when a GPU/performance
+  report comes in - both change what "56%" or "90%" actually means and which fix
+  (throttling further vs. rendering once and mirroring the result) is the right one.
+
 ## 9. Continuing with Claude
-Point Claude at this file first. Good next asks: "add fog + lightning to storms",
-"add a Countryside or Rainforest scene", "wire code signing into CI",
-"start the Android WallpaperService port". Also pending, agreed but not started: a
-texture/shading realism pass on the Mountains scene (noise/grain, directional shading,
-surface detail) as a proof of concept before rolling it out to the other scenes — the
-current look is flat-shaded vector art, which reads as illustrated no matter how good
-the composition is. Always run `node tools/build-wallpaper.js` after engine/prod-boot
-edits.
+Point Claude at this file first. **Immediate next step, pending as of this handoff**:
+confirm with the user whether v1.0.17 (currently the latest tag/release) actually
+brought idle GPU usage down to a reasonable level on their 2-monitor/integrated-
+graphics machine - see §6's adaptive-redraw-rate entry for the full status and what
+the next lever is (one-render-many-windows, not a lower FPS number) if it didn't. This
+was mid-troubleshooting, not a confirmed-closed bug, when this session ended.
+
+Other good next asks: "add fog + lightning to storms", "add a Countryside or Rainforest
+scene", "wire code signing into CI", "build the real macOS wallpaper-attach mechanism"
+(the `build-mac` CI job and `mac` package.json config already exist as scaffolding -
+see §7 - but nothing actually attaches the window behind icons on macOS yet). Also
+pending, agreed but not started: a texture/shading realism pass on the Mountains scene
+(noise/grain, directional shading, surface detail) as a proof of concept before rolling
+it out to the other scenes — the current look is flat-shaded vector art, which reads as
+illustrated no matter how good the composition is.
+
+**Sibling project**: the Android app (`E:\Claude-Tools\LivingWallpaper-Android`) is a
+separate, from-scratch Kotlin port of this same Mountains scene - already published to
+Google Play. See its own `CLAUDE-HANDOFF.md`; no shared code or build step keeps the
+two in sync, so a fix/feature usually needs doing by hand in both places if it applies
+to both (this session's GPU/redraw-rate work was desktop-only and has **not** been
+checked against the Android port, which already has its own separate battery-aware
+redraw-interval scheme - see that doc's §3.1).
+
+Always run `node tools/build-wallpaper.js` after engine/prod-boot edits - and remember
+the injection anchors in `tools/build-wallpaper.js` do exact string matches against
+`tools/engine-source.html`'s text (see step 2, the pause-guard injection); an edit that
+changes the matched text without updating the anchor fails **silently** via
+`String.replace` (returns the string unchanged) and is only caught by the script's own
+`html.indexOf(...) === -1` sanity checks - always re-run the build after touching
+anything near an anchored line and confirm it doesn't throw.
